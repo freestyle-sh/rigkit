@@ -1,0 +1,56 @@
+---
+title: "Changelog"
+description: "Product updates and releases for Rigkit."
+---
+
+<Update label="May 22, 2026" tags={["v0.2.11", "v0.2.12", "v0.2.13", "v0.2.14"]}>
+
+## New features
+
+**Scoped providers with `.addProvider`**
+
+Workflows and fragments now attach providers at the point they're needed using `.addProvider("name", provider)`. Downstream tasks, workspace hooks, and operations access them through `providers.<name>`. Cache fingerprints are scoped to providers in scope, so changing one provider's config only invalidates the tasks that actually use it. See [Workflows](/guides/workflows) and [Fragments](/advanced/fragments).
+
+**Multiple workflows per project**
+
+A single `rigkit/index.ts` can now export more than one workflow. Use `rig ls` and `rig run` to discover and target a specific workflow when you have more than one setup graph in the same project.
+
+**Provider requirements in `rig plan`**
+
+`rig plan` now reports provider-side checks—missing auth, team selection, and other prerequisites—before running tasks, so you can see what a provider needs without starting OAuth or applying anything. For the Freestyle provider, multi-team accounts are prompted once and the choice is remembered. Clear it with `rig providers freestyle clear`. See the [Freestyle provider](/providers/freestyle).
+
+**Shell completion**
+
+Generate completion scripts for zsh, bash, and fish with `rig completion <shell>`. Completion suggests commands, options, workspace names, and operation flags. See [`rig completion`](/reference/cli#rig-completion).
+
+## Updates
+
+**Cmux provider overhaul**
+
+The Cmux provider has been rebuilt around the new scoped-provider model with a simpler capabilities surface and clearer host integration. See the [Cmux provider](/providers/cmux).
+
+**Freestyle VS Code options**
+
+The Freestyle provider's VS Code workspace options have been reworked so `open-vscode` and related operations expose the right knobs and apply them consistently. See the [Freestyle provider](/providers/freestyle).
+
+**`rig init` improvements**
+
+`rig init` now scaffolds new projects with the current authoring style, including scoped providers and the typed multi-workflow shape.
+
+**Versioned documentation**
+
+Docs are now versioned. Pick a specific Rigkit version from the version switcher; the latest stable release is the default.
+
+## Removed
+
+**`rig.config.ts` support removed**
+
+Projects must use `rigkit/index.ts` as the entry point. If you still have a `rig.config.ts`, move your config into `rigkit/index.ts`. See the [Quickstart](/guides/quickstart).
+
+## Fixes
+
+- `step.invalidate` now returns the correct types when called from inside a task.
+- More reliable version compatibility checks and Rigkit version caching for faster CLI startup.
+- Various improvements to `rig ls` and `rig run` output.
+
+</Update>

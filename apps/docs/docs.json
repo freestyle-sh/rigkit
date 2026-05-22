@@ -88,6 +88,12 @@
             "pages": [
               "providers/creating-providers"
             ]
+          },
+          {
+            "group": "Changelog",
+            "pages": [
+              "changelog/overview"
+            ]
           }
         ]
       },
