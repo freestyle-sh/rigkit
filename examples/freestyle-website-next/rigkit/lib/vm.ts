@@ -1,4 +1,5 @@
 import type { FreestyleSdkVm } from "@rigkit/provider-freestyle";
+import { devServerLogPath, devServerPidPath } from "./config";
 import { shellQuote } from "./shell";
 
 type ExecInput = Parameters<FreestyleSdkVm["exec"]>[0];
@@ -35,6 +36,17 @@ export async function waitForLocalhostHtml(
       "  fi",
       "  sleep 1",
       "done",
+      "echo '--- dev server readiness diagnostics ---'",
+      `echo 'url: ${url}'`,
+      `echo 'pid file: ${devServerPidPath}'`,
+      `if [ -f ${shellQuote(devServerPidPath)} ]; then pid=$(cat ${shellQuote(devServerPidPath)}); echo "pid: $pid"; ps -fp "$pid" || true; else echo 'pid file missing'; fi`,
+      `echo 'metadata:'`,
+      `cat ${shellQuote(devServerLogPath)}.meta 2>/dev/null || echo 'metadata missing'`,
+      `echo 'listening sockets:'`,
+      "(ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null || netstat -an 2>/dev/null) | sed -n '1,120p' || true",
+      `echo 'dev server log tail:'`,
+      `tail -n 200 ${shellQuote(devServerLogPath)} 2>/dev/null || echo 'dev server log missing'`,
+      `echo 'final curl:'`,
       `curl -i -sS --max-time 10 ${shellQuote(url)} | sed -n '1,80p' || true`,
       "exit 1",
     ].join("\n"),

@@ -45,6 +45,7 @@ export const cloneAndInstallTask: SetupTaskHandler<
       command: [
         "set -e",
         `export HOME=${shellQuote(vmHome)}`,
+        "export GIT_TERMINAL_PROMPT=0",
         `cd ${shellQuote(repoPath)}`,
         `git remote set-url origin ${shellQuote(repoUrl)}`,
         "git fetch --prune origin",

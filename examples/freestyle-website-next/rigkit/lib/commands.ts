@@ -212,6 +212,7 @@ export function startDevServerCommand(options: {
     `cd ${shellQuote(options.repoPath)}`,
     `if [ -f ${shellQuote(devServerPidPath)} ]; then kill "$(cat ${shellQuote(devServerPidPath)})" 2>/dev/null || true; fi`,
     `: > ${shellQuote(devServerLogPath)}`,
+    `printf 'started_at=%s\nrepo=%s\ncommand=%s\n' "$(date -Is)" ${shellQuote(options.repoPath)} ${shellQuote(options.command)} > ${shellQuote(devServerLogPath)}.meta`,
     `nohup ${options.command} </dev/null >${shellQuote(devServerLogPath)} 2>&1 &`,
     `echo $! > ${shellQuote(devServerPidPath)}`,
     `echo "dev server started (pid $(cat ${shellQuote(devServerPidPath)}))"`,
