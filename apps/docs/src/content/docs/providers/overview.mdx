@@ -23,7 +23,10 @@ export const website = app
   .addProvider("terminal", freestyle.terminal())
   .task("prepare", async ({ providers }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
-      logger: console.log,
+      // A Freestyle VM reaches nothing it has not been allowed to.
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
     });
     // ...
   })

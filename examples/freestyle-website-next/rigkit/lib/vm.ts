@@ -1,4 +1,8 @@
-import type { FreestyleSdkVm } from "@rigkit/provider-freestyle";
+import {
+  FREESTYLE_EXEC_TIMEOUT_CAP_MS,
+  execLongCommand,
+  type FreestyleSdkVm,
+} from "@rigkit/provider-freestyle";
 import { devServerLogPath, devServerPidPath } from "./config";
 import { shellQuote } from "./shell";
 
@@ -9,6 +13,22 @@ export async function execOrThrow(
   label: string,
   options: ExecInput,
 ): Promise<Awaited<ReturnType<FreestyleSdkVm["exec"]>>> {
+  // Freestyle caps one exec at five minutes; longer jobs run detached and
+  // are polled through execLongCommand instead.
+  if (typeof options !== "string" && (options.timeoutMs ?? 0) > FREESTYLE_EXEC_TIMEOUT_CAP_MS) {
+    const long = await execLongCommand(vm, {
+      command: options.command,
+      timeoutMs: options.timeoutMs,
+      ...(options.env ? { env: options.env } : {}),
+    });
+    if (long.timedOut || (long.statusCode ?? 0) !== 0) {
+      throw new Error(
+        `${label} ${long.timedOut ? "timed out" : "failed"}:\n${long.stdout}`.trim(),
+      );
+    }
+    return { stdout: long.stdout, stderr: "", statusCode: long.statusCode };
+  }
+
   const result = await vm.exec(options);
   if ((result.statusCode ?? 0) !== 0) {
     throw new Error(

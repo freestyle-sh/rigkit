@@ -10,7 +10,7 @@
   "dependencies": {
     "@rigkit/provider-freestyle": "workspace:*",
     "@rigkit/sdk": "workspace:*",
-    "freestyle": "^0.1.52"
+    "freestyle": "^0.2.2"
   },
   "devDependencies": {
     "@rigkit/cli": "workspace:*",

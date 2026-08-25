@@ -19,7 +19,10 @@ object returned by the task.
 ```ts
 .task("prepare", async ({ providers }) => {
   const { vm, vmId } = await providers.freestyle.client.vms.create({
-    logger: console.log,
+    // A Freestyle VM reaches nothing it has not been allowed to.
+    firewall: {
+      rules: [{ action: "allow", source: {}, destination: { public: true } }],
+    },
   });
 
   try {
@@ -30,7 +33,7 @@ object returned by the task.
       },
     };
   } finally {
-    await providers.freestyle.client.vms.delete({ vmId });
+    await providers.freestyle.client.vms.delete(vmId);
   }
 });
 ```
@@ -171,7 +174,10 @@ But the `gcloud` cli expires after a day, so every day you might need to reauthe
   "setup-gcloud",
   async ({ providers }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
-      logger: console.log,
+      // A Freestyle VM reaches nothing it has not been allowed to.
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
     });
 
     try {
@@ -194,7 +200,7 @@ But the `gcloud` cli expires after a day, so every day you might need to reauthe
         },
       };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   },
 );
@@ -208,8 +214,11 @@ Then check credentials daily and reauthenticate if needed:
   { cacheTTL: "24h" },
   async ({ step, providers }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
+      // A Freestyle VM reaches nothing it has not been allowed to.
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
       snapshotId: step.ctx.snapshotId,
-      logger: console.log,
     });
 
     try {
@@ -228,7 +237,7 @@ Then check credentials daily and reauthenticate if needed:
 
       return { ctx: step.ctx };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   },
 );
@@ -279,7 +288,10 @@ Create a setup task:
   { cacheTTL: "30d" },
   async ({ providers }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
-      logger: console.log,
+      // A Freestyle VM reaches nothing it has not been allowed to.
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
     });
 
     try {
@@ -293,7 +305,7 @@ Create a setup task:
         },
       };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   },
 );
@@ -308,8 +320,11 @@ repo or dependencies are stale:
   { cacheTTL: "1d" },
   async ({ step, providers }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
+      // A Freestyle VM reaches nothing it has not been allowed to.
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
       snapshotId: step.ctx.snapshotId,
-      logger: console.log,
     });
 
     try {
@@ -323,7 +338,7 @@ repo or dependencies are stale:
 
       return { ctx: step.ctx };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   },
 );

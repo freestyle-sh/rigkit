@@ -31,14 +31,17 @@ export const website = app
   .addProvider("freestyle", freestyleProvider)
   .task("prepare", async ({ providers }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
-      logger: console.log,
+      // A Freestyle VM reaches nothing it has not been allowed to.
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
     });
 
     try {
       const snapshot = await vm.snapshot();
       return { ctx: { snapshotId: snapshot.snapshotId } };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   });
 ```
@@ -59,9 +62,12 @@ export const api = services
   .addProvider("freestyle", freestyleProvider)
   .task("prepare-api", async ({ providers }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
-      logger: console.log,
+      // A Freestyle VM reaches nothing it has not been allowed to.
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
     });
-    await providers.freestyle.client.vms.delete({ vmId });
+    await providers.freestyle.client.vms.delete(vmId);
     return { ctx: { packageName: "@acme/api" } };
   });
 
@@ -282,14 +288,7 @@ rig cache dev clear --local
 ## Logs and metadata
 
 Task `console.log`, `console.info`, `console.debug`, `console.warn`, and
-`console.error` are captured by the runtime and streamed to the CLI. Provider
-SDKs that accept a logger should receive `console.log`:
-
-```ts
-await freestyle.client.vms.create({
-  logger: console.log,
-});
-```
+`console.error` are captured by the runtime and streamed to the CLI.
 
 Use `step.metadata(...)` for structured run metadata:
 

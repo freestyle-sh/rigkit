@@ -217,9 +217,12 @@ const projectSetup = app
   .addProvider("freestyle", freestyleProvider)
   .task("prepare-project-image", async ({ providers, step }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
+      // A Freestyle VM reaches nothing it has not been allowed to.
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
       snapshotId: step.ctx.snapshotId,
       idleTimeoutSeconds: step.ctx.freestyleCompanyBase.idleTimeoutSeconds,
-      logger: console.log,
     });
 
     try {
@@ -235,7 +238,7 @@ const projectSetup = app
         },
       };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   });
 

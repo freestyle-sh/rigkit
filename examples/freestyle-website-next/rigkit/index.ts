@@ -3,7 +3,7 @@ import {
   attachDevServerLogCommand,
   startDevServerCommand,
 } from "./lib/commands";
-import { vmIdleTimeoutSeconds } from "./lib/config";
+import { vmFirewall, vmIdleTimeoutSeconds } from "./lib/config";
 import {
   cmuxProvider,
   freestyleProvider,
@@ -69,6 +69,7 @@ export const freestyleWebsiteNext = app
     create: async ({ workflow, providers, workspace }) => {
       const created = await providers.freestyle.client.vms.create({
         snapshotId: workflow.ctx.snapshotId,
+        firewall: vmFirewall,
         idleTimeoutSeconds: vmIdleTimeoutSeconds,
       });
       const { vmId } = created;
@@ -106,12 +107,12 @@ export const freestyleWebsiteNext = app
           devPort: workflow.ctx.devPort,
         };
       } catch (error) {
-        await providers.freestyle.client.vms.delete({ vmId });
+        await providers.freestyle.client.vms.delete(vmId);
         throw error;
       }
     },
     remove: async ({ providers, workspace }) => {
-      await providers.freestyle.client.vms.delete({ vmId: workspace.ctx.vmId });
+      await providers.freestyle.client.vms.delete(workspace.ctx.vmId);
     },
   })
   .addProvider("cmux", cmuxProvider)

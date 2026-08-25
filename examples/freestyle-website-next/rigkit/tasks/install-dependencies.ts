@@ -1,4 +1,4 @@
-import { vmIdleTimeoutSeconds } from "../lib/config";
+import { vmFirewall, vmIdleTimeoutSeconds } from "../lib/config";
 import {
   installAptDependenciesCommand,
   installJavaScriptToolsCommand,
@@ -21,8 +21,8 @@ async function runSnapshotStage(
 ): Promise<{ ctx: SnapshotContext }> {
   const { vm, vmId } = await providers.freestyle.client.vms.create({
     ...(input.snapshotId ? { snapshotId: input.snapshotId } : {}),
+    firewall: vmFirewall,
     idleTimeoutSeconds: vmIdleTimeoutSeconds,
-    logger: console.log,
   });
 
   try {
@@ -34,7 +34,7 @@ async function runSnapshotStage(
     const snapshot = await vm.snapshot();
     return { ctx: { snapshotId: snapshot.snapshotId } };
   } finally {
-    await providers.freestyle.client.vms.delete({ vmId });
+    await providers.freestyle.client.vms.delete(vmId);
   }
 }
 

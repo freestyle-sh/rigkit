@@ -83,6 +83,9 @@ BUN_INSTALL=/opt/bun bash "$tmp_dir/install-bun.sh"
 ln -sf /opt/bun/bin/bun /usr/local/bin/bun
 
 echo "installing codex"
+# The Freestyle base image ships codex preinstalled as a symlink into its own
+# node; remove it so npm can link the pinned install without EEXIST.
+rm -f /usr/local/bin/codex
 npm install -g @openai/codex
 mkdir -p /root/.codex
 printf 'cli_auth_credentials_store = "file"\\n' > /root/.codex/config.toml

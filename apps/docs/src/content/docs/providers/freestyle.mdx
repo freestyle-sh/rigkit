@@ -57,12 +57,14 @@ const setup = app
   .addProvider("freestyle", freestyleProvider)
   .task("install-dependencies", async ({ providers }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
+      // A Freestyle VM reaches nothing it has not been allowed to.
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
       idleTimeoutSeconds: 3600,
-      memSizeGb: 16,
-      vcpuCount: 4,
-      rootfsSizeGb: 24,
-      logger: console.log,
     });
+    // Resources come from the snapshot; resize is grow-only.
+    await vm.resize({ cpu: 4, memory: 16 * 1024, storage: 24 * 1024 });
 
     try {
       const install = await vm.exec({
@@ -76,13 +78,12 @@ const setup = app
       const snapshot = await vm.snapshot();
       return { ctx: { snapshotId: snapshot.snapshotId } };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   });
 ```
 
-Pass `logger: console.log` to Freestyle SDK calls that support logging. Rigkit
-streams task console output to the CLI.
+Rigkit streams task console output to the CLI.
 
 ## Create workspace VMs
 
@@ -91,16 +92,16 @@ streams task console output to the CLI.
   create: async ({ workflow, providers }) => {
     const { vmId } = await providers.freestyle.client.vms.create({
       snapshotId: workflow.ctx.snapshotId,
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
       idleTimeoutSeconds: 3600,
-      logger: console.log,
     });
 
     return { vmId };
   },
   remove: async ({ providers, workspace }) => {
-    await providers.freestyle.client.vms.delete({
-      vmId: workspace.ctx.vmId,
-    });
+    await providers.freestyle.client.vms.delete(workspace.ctx.vmId);
   },
 });
 ```

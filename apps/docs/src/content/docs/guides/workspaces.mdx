@@ -29,8 +29,11 @@ export const website = app
   .workspace({
     create: async ({ workflow, providers, workspace }) => {
       const { vmId } = await providers.freestyle.client.vms.create({
+        // A Freestyle VM reaches nothing it has not been allowed to.
+        firewall: {
+          rules: [{ action: "allow", source: {}, destination: { public: true } }],
+        },
         snapshotId: workflow.ctx.snapshotId,
-        logger: console.log,
       });
 
       return {
@@ -41,9 +44,7 @@ export const website = app
       };
     },
     remove: async ({ providers, workspace }) => {
-      await providers.freestyle.client.vms.delete({
-        vmId: workspace.ctx.vmId,
-      });
+      await providers.freestyle.client.vms.delete(workspace.ctx.vmId);
     },
   });
 ```
@@ -196,8 +197,11 @@ If `create` allocates resources and then fails, clean them up before throwing:
 ```ts
 create: async ({ workflow, providers, workspace }) => {
   const { vmId } = await providers.freestyle.client.vms.create({
+    // A Freestyle VM reaches nothing it has not been allowed to.
+    firewall: {
+      rules: [{ action: "allow", source: {}, destination: { public: true } }],
+    },
     snapshotId: workflow.ctx.snapshotId,
-    logger: console.log,
   });
 
   try {
@@ -205,7 +209,7 @@ create: async ({ workflow, providers, workspace }) => {
     // Configure the VM here.
     return { vmId, branch };
   } catch (error) {
-    await providers.freestyle.client.vms.delete({ vmId });
+    await providers.freestyle.client.vms.delete(vmId);
     throw error;
   }
 }

@@ -8,7 +8,7 @@ import { RIGKIT_PROVIDER_FREESTYLE_VERSION } from "./version.ts";
 
 const DEFAULT_STACK_API_URL = "https://api.stack-auth.com";
 const DEFAULT_STACK_APP_URL = "https://dash.freestyle.sh";
-const DEFAULT_FREESTYLE_API_URL = "https://api.freestyle.sh";
+const DEFAULT_FREESTYLE_API_URL = "https://beta-api.freestyle.sh";
 const DEFAULT_STACK_PROJECT_ID = "0edf478c-f123-46fb-818f-34c0024a9f35";
 const DEFAULT_STACK_PUBLISHABLE_CLIENT_KEY = "pck_h2aft7g9pqjzrkdnzs199h1may5wjtdtdxeex7m2wzp1r";
 const DEFAULT_CLI_AUTH_TIMEOUT_MILLIS = 10 * 60 * 1000;
@@ -99,7 +99,7 @@ export async function createFreestyleAuthenticatedClient(
   }
 
   const { identity, identityId } = await auth.client.identities.create();
-  const { token, tokenId } = await identity.tokens.create();
+  const { token, id: tokenId } = await identity.tokens.create();
   const createdIdentity = store.saveIdentity({
     key: auth.identityKey,
     identityId: freestyleIdentityId(identityId),
@@ -209,80 +209,6 @@ export function freestyleProviderChecksFromAuthenticated(
   }];
 }
 
-export function createFreestyleProxyFetch(input: {
-  dashboardUrl: string;
-  accessToken: string;
-  teamId: string;
-  fetch?: typeof fetch;
-}): typeof fetch {
-  const fetchFn = input.fetch ?? globalThis.fetch;
-  const dashboardUrl = trimTrailingSlash(input.dashboardUrl);
-  const backgroundRequests = new Map<string, string>();
-
-  const proxyFetch = async (resource: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
-    const url = resourceUrl(resource);
-    const path = `${url.pathname}${url.search}`.replace(/^\/+/, "");
-    const freestyleRequestInit: RequestInit = {
-      ...init,
-      headers: withRigkitHeaders(init?.headers),
-    };
-    const proxyResponse = await fetchFn(`${dashboardUrl}/api/proxy/request`, {
-      method: "POST",
-      headers: withRigkitHeaders({
-        "Content-Type": "application/json",
-      }),
-      body: JSON.stringify({
-        data: {
-          accessToken: input.accessToken,
-          teamId: input.teamId,
-          path,
-          method: resolveRequestMethod(resource, init),
-          headers: Object.fromEntries(new Headers(freestyleRequestInit.headers).entries()),
-          body: init?.body ? String(init.body) : undefined,
-        },
-      }),
-    });
-
-    if (!proxyResponse.ok) {
-      const errorText = await proxyResponse.text();
-      await logFreestyleApiRequestFailure({
-        backgroundRequests,
-        resource,
-        init: freestyleRequestInit,
-        response: proxyResponse,
-        responseText: errorText,
-      });
-      const normalized = normalizeProxyError(errorText, proxyResponse.status);
-      return new Response(normalized.body, {
-        status: proxyResponse.status,
-        statusText: proxyResponse.statusText,
-        headers: proxyResponseHeaders(proxyResponse, normalized.contentType),
-      });
-    }
-
-    const data = await proxyResponse.json();
-    if (isBackgroundRequestPending(data)) {
-      const requestId = backgroundRequestId(data);
-      if (requestId) {
-        backgroundRequests.set(requestId, formatReplayableFetchRequest(resource, freestyleRequestInit));
-      }
-      const headers = proxyResponseHeaders(proxyResponse);
-      if (requestId) headers.set("x-freestyle-background-request-id", requestId);
-      return Response.json(data, {
-        status: 202,
-        headers,
-      });
-    }
-    return Response.json(data, {
-      headers: proxyResponseHeaders(proxyResponse),
-    });
-  };
-
-  return Object.assign(proxyFetch, {
-    preconnect: fetchFn.preconnect?.bind(fetchFn) ?? (() => {}),
-  }) as typeof fetch;
-}
-
 export function createFreestyleSdkFetch(fetchFn: typeof fetch = globalThis.fetch): typeof fetch {
   const backgroundRequests = new Map<string, string>();
   const rigkitFetch = (async (resource, init) => {
@@ -347,14 +273,10 @@ async function resolveClientAuth(input: CreateFreestyleAuthenticatedClientInput)
     local: input.local,
   });
   const client = new Freestyle({
-    apiKey: "rigkit-browser-auth",
+    stackAccessToken: refreshed.accessToken,
+    teamId: team.id,
     ...(apiUrl ? { baseUrl: apiUrl } : {}),
-    fetch: createFreestyleProxyFetch({
-      dashboardUrl: stack.dashboardUrl,
-      accessToken: refreshed.accessToken,
-      teamId: team.id,
-      fetch: fetchFn,
-    }),
+    fetch: createFreestyleSdkFetch(fetchFn),
   });
 
   return {
@@ -425,8 +347,6 @@ async function logFreestyleApiRequestFailure(input: {
   response: Response;
   responseText?: string;
 }): Promise<void> {
-  if (isFreestyleBackgroundLogRequest(input.resource)) return;
-
   const requestId = backgroundRequestIdFromResource(input.resource);
   const replayRequest = requestId ? input.backgroundRequests.get(requestId) : undefined;
   const responseSummary = await formatResponseSummary(input.response, input.responseText);
@@ -446,12 +366,8 @@ async function responseBackgroundRequestId(response: Response): Promise<string |
 
 function backgroundRequestIdFromResource(resource: Parameters<typeof fetch>[0]): string | undefined {
   const path = resourceUrl(resource).pathname;
-  const match = path.match(/\/auth\/v1\/background-requests\/([^/]+)$/);
+  const match = path.match(/\/v5\/background-requests\/([^/]+)$/);
   return match?.[1] ? decodeURIComponent(match[1]) : undefined;
-}
-
-function isFreestyleBackgroundLogRequest(resource: Parameters<typeof fetch>[0]): boolean {
-  return resourceUrl(resource).pathname === "/observability/v1/logs";
 }
 
 async function formatResponseSummary(response: Response, responseText?: string): Promise<string> {
@@ -464,14 +380,6 @@ async function formatResponseSummary(response: Response, responseText?: string):
     ...(traceId ? [`TraceId: ${traceId}`] : []),
     ...(redactedBody ? [`Response body: ${redactedBody}`] : []),
   ].join("\n");
-}
-
-function proxyResponseHeaders(response: Response, contentType?: string): Headers {
-  const headers = new Headers();
-  if (contentType) headers.set("Content-Type", contentType);
-  const traceId = responseTraceId(response);
-  if (traceId) headers.set(FREESTYLE_TRACE_ID_HEADER, traceId);
-  return headers;
 }
 
 function responseTraceId(response: Response): string | undefined {
@@ -724,28 +632,47 @@ async function resolveTeam(input: {
   fetch: typeof fetch;
   local: LocalWorkspaceRuntime;
 }): Promise<FreestyleResolvedTeam> {
-  const teamId =
-    nonEmpty(input.configuredTeamId) ??
-      nonEmpty(process.env.FREESTYLE_TEAM_ID) ??
-      nonEmpty(input.stored?.defaultTeamId);
-  if (teamId) {
-    const storedTeamName = teamId === input.stored?.defaultTeamId
+  const configuredTeamId =
+    nonEmpty(input.configuredTeamId) ?? nonEmpty(process.env.FREESTYLE_TEAM_ID);
+  if (configuredTeamId) {
+    const storedTeamName = configuredTeamId === input.stored?.defaultTeamId
       ? input.stored?.defaultTeamName
       : undefined;
     saveStackAuthState(input.storage, input.storageKey, {
       ...input.stored,
       refreshToken: input.stored?.refreshToken ?? "",
-      defaultTeamId: teamId,
+      defaultTeamId: configuredTeamId,
       defaultTeamName: storedTeamName,
       updatedAt: Date.now(),
     });
     return {
-      id: teamId,
+      id: configuredTeamId,
       ...(storedTeamName ? { displayName: storedTeamName } : {}),
     };
   }
 
+  // A stored team is only a cached choice: validate it against the account's
+  // current teams so state saved before a platform migration cannot pin a
+  // team the gateway no longer accepts.
   const teams = await listTeams(input.config, input.accessToken, input.fetch);
+  const storedTeamId = nonEmpty(input.stored?.defaultTeamId);
+  const storedTeam = teams.find((team) => team.id === storedTeamId);
+  if (storedTeam) {
+    saveStackAuthState(input.storage, input.storageKey, {
+      ...input.stored,
+      refreshToken: input.stored?.refreshToken ?? "",
+      defaultTeamId: storedTeam.id,
+      defaultTeamName: nonEmpty(storedTeam.displayName),
+      updatedAt: Date.now(),
+    });
+    return freestyleResolvedTeam(storedTeam);
+  }
+  if (storedTeamId) {
+    console.log(
+      `Stored Freestyle team ${storedTeamId} is no longer available for this account; choosing again.`,
+    );
+  }
+
   if (teams.length === 1) {
     const onlyTeam = teams[0]!;
     saveStackAuthState(input.storage, input.storageKey, {
@@ -819,23 +746,30 @@ function providerIdentityFingerprint(
 
 async function listTeams(config: StackAuthConfig, accessToken: string, fetchFn: typeof fetch): Promise<FreestyleTeam[]> {
   const response = await fetchFn(`${config.dashboardUrl}/api/cli/teams`, {
-    method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({
-      data: { accessToken },
-    }),
   });
   if (!response.ok) {
     throw new Error(`Failed to list Freestyle teams (${response.status}). ${await response.text()}`);
   }
   const data = await response.json() as unknown;
-  if (!Array.isArray(data)) {
+  const teams = isRecord(data) && Array.isArray(data.teams) ? data.teams : undefined;
+  if (!teams) {
     throw new Error("Freestyle team list response was invalid.");
   }
-  return data.filter(isFreestyleTeam);
+  return teams.filter(isDashboardTeam).map((team) => ({
+    id: team.teamId,
+    displayName: team.name,
+    sandboxAccountId: typeof team.accountId === "string" ? team.accountId : undefined,
+  }));
 }
+
+type DashboardTeam = {
+  teamId: string;
+  name?: string;
+  accountId?: string | null;
+};
 
 function stackClientHeaders(config: StackAuthConfig): Record<string, string> {
   return {
@@ -905,56 +839,6 @@ function resourceUrl(resource: Parameters<typeof fetch>[0]): URL {
   return new URL(resource.url);
 }
 
-function normalizeProxyError(errorText: string, status: number): { body: string; contentType: string } {
-  const fallbackCode = status === 400
-    ? "BAD_REQUEST"
-    : status === 401
-      ? "UNAUTHORIZED_ERROR"
-      : status === 403
-        ? "FORBIDDEN"
-        : "INTERNAL_ERROR";
-  try {
-    const parsed = JSON.parse(errorText) as Record<string, unknown>;
-    if (typeof parsed.code === "string" && typeof parsed.message === "string") {
-      return { body: JSON.stringify(redactProxyErrorDetails(parsed)), contentType: "application/json" };
-    }
-    const message = [parsed.error, parsed.message, parsed.reason].find((value) =>
-      typeof value === "string" && value.length > 0
-    );
-    if (typeof message === "string") {
-      return {
-        body: JSON.stringify({ code: fallbackCode, message, details: redactProxyErrorDetails(parsed) }),
-        contentType: "application/json",
-      };
-    }
-  } catch {
-    // Keep the non-JSON text below.
-  }
-  return {
-    body: JSON.stringify({ code: fallbackCode, message: errorText || "Request failed" }),
-    contentType: "application/json",
-  };
-}
-
-function redactProxyErrorDetails(value: Record<string, unknown>): Record<string, unknown> {
-  const details: Record<string, unknown> = {};
-  for (const [key, field] of Object.entries(value)) {
-    details[key] = /authorization|api[-_]?key|access[-_]?token|refresh[-_]?token|password|secret|credential|cookie/i
-      .test(key)
-      ? "[redacted]"
-      : field;
-  }
-  return details;
-}
-
-function isBackgroundRequestPending(value: unknown): boolean {
-  return Boolean(
-    isRecord(value) &&
-      (value.status === "pending" || value.status === "running") &&
-      (typeof value.requestId === "string" || typeof value.request_id === "string")
-  );
-}
-
 function backgroundRequestId(value: unknown): string | undefined {
   if (!isRecord(value)) return undefined;
   return typeof value.requestId === "string"
@@ -972,12 +856,12 @@ function stringField(record: Record<string, unknown>, key: string): string {
   return value;
 }
 
-function isFreestyleTeam(value: unknown): value is FreestyleTeam {
+function isDashboardTeam(value: unknown): value is DashboardTeam {
   return Boolean(
     value &&
       typeof value === "object" &&
       !Array.isArray(value) &&
-      typeof (value as { id?: unknown }).id === "string"
+      typeof (value as { teamId?: unknown }).teamId === "string"
   );
 }
 

@@ -31,9 +31,7 @@ export const executeCodexTaskOperation: WorkflowWorkspaceOperationHandler<
     throw new Error("execute-codex-task requires a non-empty task string.");
   }
 
-  const vm = providers.freestyle.client.vms.ref({
-    vmId: workspace.ctx.vmId,
-  });
+  const vm = providers.freestyle.client.vms.ref(workspace.ctx.vmId);
   const sessionName = `codex-task-${Date.now().toString(36)}`;
   const paths = codexTaskPaths(sessionName);
 

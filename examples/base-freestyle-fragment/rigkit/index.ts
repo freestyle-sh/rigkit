@@ -2,10 +2,14 @@ import {
   withFreestyleCompanyBase,
   type FreestyleCompanyBaseFragmentContext,
 } from "@rigkit/fragments";
-import { freestyle } from "@rigkit/provider-freestyle";
+import { freestyle, type FirewallSpec } from "@rigkit/provider-freestyle";
 import { workflow } from "@rigkit/sdk";
 
 const projectPath = "/workspace/company-project";
+// A Freestyle VM reaches nothing it has not been allowed to.
+const vmFirewall: FirewallSpec = {
+  rules: [{ action: "allow", source: {}, destination: { public: true } }],
+};
 
 const app = workflow("base-freestyle-fragment-example");
 const freestyleProvider = freestyle.provider();
@@ -29,8 +33,8 @@ const projectSetup = app
   .task("prepare-project-image", async ({ providers, step }) => {
     const created = await providers.freestyle.client.vms.create({
       snapshotId: step.ctx.snapshotId,
+      firewall: vmFirewall,
       idleTimeoutSeconds: step.ctx.freestyleCompanyBase.idleTimeoutSeconds,
-      logger: console.log,
     });
     const { vm, vmId } = created;
     try {
@@ -77,7 +81,7 @@ const projectSetup = app
         },
       };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   })
   .task("marker", async ({ step }) => {
@@ -98,9 +102,9 @@ export const baseFreestyleFragmentExample = app
     create: async ({ workflow, providers, workspace }) => {
       const created = await providers.freestyle.client.vms.create({
         snapshotId: workflow.ctx.snapshotId,
+        firewall: vmFirewall,
         idleTimeoutSeconds:
           workflow.ctx.freestyleCompanyBase.idleTimeoutSeconds,
-        logger: console.log,
       });
       const { vmId } = created;
       try {
@@ -114,12 +118,12 @@ export const baseFreestyleFragmentExample = app
           authenticated: workflow.ctx.freestyleCompanyBase.authenticated,
         };
       } catch (error) {
-        await providers.freestyle.client.vms.delete({ vmId });
+        await providers.freestyle.client.vms.delete(vmId);
         throw error;
       }
     },
     remove: async ({ providers, workspace }) => {
-      await providers.freestyle.client.vms.delete({ vmId: workspace.ctx.vmId });
+      await providers.freestyle.client.vms.delete(workspace.ctx.vmId);
     },
   })
   .workspaceOperation("ssh", {

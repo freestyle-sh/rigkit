@@ -4,6 +4,7 @@ import {
   repo,
   repoPath,
   repoUrl,
+  vmFirewall,
   vmHome,
   vmIdleTimeoutSeconds,
 } from "../lib/config";
@@ -18,8 +19,8 @@ export const cloneAndInstallTask: SetupTaskHandler<
 > = async ({ step, providers }) => {
   const created = await providers.freestyle.client.vms.create({
     snapshotId: step.ctx.snapshotId,
+    firewall: vmFirewall,
     idleTimeoutSeconds: vmIdleTimeoutSeconds,
-    logger: console.log,
   });
   const { vmId } = created;
   const { vm } = created;
@@ -66,6 +67,6 @@ export const cloneAndInstallTask: SetupTaskHandler<
       },
     };
   } finally {
-    await providers.freestyle.client.vms.delete({ vmId });
+    await providers.freestyle.client.vms.delete(vmId);
   }
 };

@@ -2,7 +2,7 @@ import {
   configureGitIdentityCommand,
   withVmHome,
 } from "../lib/commands";
-import { vmIdleTimeoutSeconds } from "../lib/config";
+import { vmFirewall, vmIdleTimeoutSeconds } from "../lib/config";
 import type { SnapshotContext } from "../lib/types";
 import { execOrThrow } from "../lib/vm";
 import type { SetupTaskHandler } from "./types";
@@ -13,8 +13,8 @@ export const githubAuthTask: SetupTaskHandler<
 > = async ({ step, providers }) => {
   const created = await providers.freestyle.client.vms.create({
     snapshotId: step.ctx.snapshotId,
+    firewall: vmFirewall,
     idleTimeoutSeconds: vmIdleTimeoutSeconds,
-    logger: console.log,
   });
   const { vmId } = created;
   const { vm } = created;
@@ -55,6 +55,6 @@ export const githubAuthTask: SetupTaskHandler<
     const snapshot = await vm.snapshot();
     return { ctx: { snapshotId: snapshot.snapshotId } };
   } finally {
-    await providers.freestyle.client.vms.delete({ vmId });
+    await providers.freestyle.client.vms.delete(vmId);
   }
 };

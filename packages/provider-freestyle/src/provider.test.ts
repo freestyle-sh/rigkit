@@ -30,12 +30,12 @@ describe("Freestyle provider host adapters", () => {
 
     await expect(runtime.createSSHOptions({ vmId: "vm-stream" })).resolves.toEqual({
       kind: "ssh",
-      host: "vm-ssh.freestyle.sh",
+      host: "beta-ssh.freestyle.sh",
       username: "vm-stream+root",
       auth: { type: "token", token: "token" },
-      command: "ssh vm-stream+root:token@vm-ssh.freestyle.sh",
+      command: "ssh vm-stream+root:token@beta-ssh.freestyle.sh",
     });
-    expect(requests).toContain("POST https://api.freestyle.sh/identity/v1/identities/identity-stream/permissions/vm/vm-stream");
+    expect(requests).toContain("POST https://beta-api.freestyle.sh/v5/identities/identity-stream/permissions/vm");
   });
 
   test("creates cmux ssh options with Freestyle-owned ssh settings", async () => {
@@ -55,7 +55,7 @@ describe("Freestyle provider host adapters", () => {
 
     expect(ssh).toEqual({
       kind: "ssh",
-      destination: "vm-stream+root,token@vm-ssh.freestyle.sh",
+      destination: "vm-stream,token@vm-stream.beta-ssh.freestyle.sh",
       skipDaemonBootstrap: true,
       sshOptions: [
         "StrictHostKeyChecking=no",
@@ -76,7 +76,7 @@ describe("Freestyle provider host adapters", () => {
         identities: {
           ref: () => ({
             permissions: {
-              vms: {
+              vm: {
                 grant: async () => {
                   calls.push("grant");
                   throw new Error("PERMISSION_ALREADY_EXISTS: Permission already exists");
@@ -94,7 +94,7 @@ describe("Freestyle provider host adapters", () => {
     }).runtime(providerContext());
 
     await expect(runtime.cmux.createSshOptions({ vmId: "vm-stream" })).resolves.toMatchObject({
-      destination: "vm-stream+root,token@vm-ssh.freestyle.sh",
+      destination: "vm-stream,token@vm-stream.beta-ssh.freestyle.sh",
     });
     expect(calls).toEqual(["grant", "update"]);
   });
@@ -110,8 +110,15 @@ describe("Freestyle provider host adapters", () => {
 
     const url = await runtime.vscode.createUrl({ vmId: "vm-stream", cwd: "/workspace/site" });
 
+    // VS Code splits the remote authority on "+", so the default-user URL
+    // must carry no user suffix and no percent-encoding.
     expect(url).toBe(
-      "vscode://vscode-remote/ssh-remote+vm-stream%2Broot%3Atoken%40vm-ssh.freestyle.sh/workspace/site?windowId=_blank",
+      "vscode://vscode-remote/ssh-remote+vm-stream,token@vm-stream.beta-ssh.freestyle.sh/workspace/site?windowId=_blank",
+    );
+
+    const withUser = await runtime.vscode.createUrl({ vmId: "vm-stream", user: "developer" });
+    expect(withUser).toBe(
+      "vscode://vscode-remote/ssh-remote+vm-stream+developer,token@vm-stream.beta-ssh.freestyle.sh?windowId=_blank",
     );
   });
 
@@ -126,7 +133,7 @@ describe("Freestyle provider host adapters", () => {
 
     await expect(runtime.createSSHOptions({ vmId: "vm-stream", user: "ubuntu" })).resolves.toMatchObject({
       username: "vm-stream+ubuntu",
-      command: "ssh vm-stream+ubuntu:token@vm-ssh.freestyle.sh",
+      command: "ssh vm-stream+ubuntu:token@beta-ssh.freestyle.sh",
     });
   });
 
@@ -147,10 +154,10 @@ describe("Freestyle provider host adapters", () => {
     await expect(runtime.open("GitHub auth", {
       ssh: {
         kind: "ssh",
-        host: "vm-ssh.freestyle.sh",
+        host: "beta-ssh.freestyle.sh",
         username: "vm-stream+root",
         auth: { type: "token", token: "token" },
-        command: "ssh vm-stream+root:token@vm-ssh.freestyle.sh",
+        command: "ssh vm-stream+root:token@beta-ssh.freestyle.sh",
       },
       command: "gh auth login --hostname github.com",
     })).resolves.toEqual({ finished: true });
@@ -160,14 +167,32 @@ describe("Freestyle provider host adapters", () => {
     expect(html).toContain("const canFinishWhileRunning = false;");
   });
 
+  test("interactive SSH commands never prompt for host key confirmation", () => {
+    const command = buildInteractiveSshCommand(
+      {
+        kind: "ssh",
+        host: "beta-ssh.freestyle.sh",
+        username: "vm-stream+root",
+        auth: { type: "token", token: "token" },
+        command: "ssh vm-stream+root:token@beta-ssh.freestyle.sh",
+      },
+      undefined,
+    );
+
+    expect(command).toContain("-o 'StrictHostKeyChecking=no'");
+    expect(command).toContain("-o 'UserKnownHostsFile=/dev/null'");
+    expect(command).toContain("-o 'IdentityFile=/dev/null'");
+    expect(command).toContain("'vm-stream+root:token@beta-ssh.freestyle.sh'");
+  });
+
   test("sets remote browser open fallbacks for SSH terminal commands", () => {
     const command = buildInteractiveSshCommand(
       {
         kind: "ssh",
-        host: "vm-ssh.freestyle.sh",
+        host: "beta-ssh.freestyle.sh",
         username: "vm-stream+root",
         auth: { type: "token", token: "token" },
-        command: "ssh vm-stream+root:token@vm-ssh.freestyle.sh",
+        command: "ssh vm-stream+root:token@beta-ssh.freestyle.sh",
       },
       "gh auth login --hostname github.com --web",
     );
@@ -181,10 +206,10 @@ describe("Freestyle provider host adapters", () => {
     const command = buildInteractiveSshCommand(
       {
         kind: "ssh",
-        host: "vm-ssh.freestyle.sh",
+        host: "beta-ssh.freestyle.sh",
         username: "vm-stream+root",
         auth: { type: "token", token: "token" },
-        command: "ssh vm-stream+root:token@vm-ssh.freestyle.sh",
+        command: "ssh vm-stream+root:token@beta-ssh.freestyle.sh",
       },
       "gh auth status -h github.com",
       { keepOpenAfterCommand: true },
@@ -213,10 +238,10 @@ describe("Freestyle provider host adapters", () => {
     await runtime.open("GitHub auth", {
       ssh: {
         kind: "ssh",
-        host: "vm-ssh.freestyle.sh",
+        host: "beta-ssh.freestyle.sh",
         username: "vm-stream+root",
         auth: { type: "token", token: "token" },
-        command: "ssh vm-stream+root:token@vm-ssh.freestyle.sh",
+        command: "ssh vm-stream+root:token@beta-ssh.freestyle.sh",
       },
       command: "gh auth login --hostname github.com",
       keepOpenAfterCommand: true,

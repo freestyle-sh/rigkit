@@ -37,9 +37,12 @@ const repoSetup = app
   .addProvider("terminal", terminalProvider)
   .task("clone-repo", async ({ providers, step }) => {
     const created = await providers.freestyle.client.vms.create({
+      // A Freestyle VM reaches nothing it has not been allowed to.
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
       snapshotId: step.ctx.snapshotId,
       idleTimeoutSeconds: step.ctx.freestyleCompanyBase.idleTimeoutSeconds,
-      logger: console.log,
     });
     const { vm, vmId } = created;
     try {
@@ -47,7 +50,7 @@ const repoSetup = app
       const snapshot = await vm.snapshot();
       return { ctx: { ...step.ctx, snapshotId: snapshot.snapshotId, repoPath: "/workspace/app" } };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   });
 

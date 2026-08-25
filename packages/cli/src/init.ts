@@ -160,12 +160,17 @@ export function starterConfig(): string {
 
   return `import { workflow } from "@rigkit/sdk";
 import { cmux } from "@rigkit/provider-cmux";
-import { freestyle } from "@rigkit/provider-freestyle";
+import { execLongCommand, freestyle, type FirewallSpec } from "@rigkit/provider-freestyle";
 
 const repo = "octocat/Hello-World";
 const repoPath = "/workspace/Hello-World";
 const vmHome = "/root";
 const vmIdleTimeoutSeconds = 3600;
+// A Freestyle VM reaches nothing it has not been allowed to; these steps need
+// the public internet for apt, GitHub, and browser logins.
+const vmFirewall: FirewallSpec = {
+  rules: [{ action: "allow", source: {}, destination: { public: true } }],
+};
 
 const freestyleProvider = freestyle.provider();
 const terminalProvider = freestyle.terminal();
@@ -177,33 +182,36 @@ export const dev = workflow(${workflowName})
   .step("install-dependencies", async ({ providers }) => {
     console.log("installing base dependencies");
     const { vm, vmId } = await providers.freestyle.client.vms.create({
+      firewall: vmFirewall,
       idleTimeoutSeconds: vmIdleTimeoutSeconds,
-      logger: console.log,
     });
     try {
-      const dependencies = await vm.exec({
+      // Freestyle caps one exec at five minutes; execLongCommand runs longer
+      // jobs detached in the guest and polls until they finish.
+      const dependencies = await execLongCommand(vm, {
         command: installDependenciesCommand(),
         timeoutMs: 10 * 60 * 1000,
+        onOutput: (chunk) => console.log(chunk.trimEnd()),
       });
-      if ((dependencies.statusCode ?? 0) !== 0) {
-        throw new Error(\`Base dependency install failed:\\n\${dependencies.stdout ?? ""}\${dependencies.stderr ?? ""}\`.trim());
+      if (dependencies.timedOut || (dependencies.statusCode ?? 0) !== 0) {
+        throw new Error(\`Base dependency install \${dependencies.timedOut ? "timed out" : "failed"}:\\n\${dependencies.stdout}\`.trim());
       }
 
       const result = await vm.exec("node --version");
-      if ((result.statusCode ?? 0) !== 0 || !result.stdout.trim().startsWith("v22.")) {
+      if ((result.statusCode ?? 0) !== 0 || !(result.stdout ?? "").trim().startsWith("v22.")) {
         throw new Error(\`Expected Node.js v22, got: \${result.stdout}\${result.stderr}\`);
       }
       const snapshot = await vm.snapshot();
       return { ctx: { snapshotId: snapshot.snapshotId } };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   })
   .step("github-auth", async ({ providers, step }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
       snapshotId: step.ctx.snapshotId,
+      firewall: vmFirewall,
       idleTimeoutSeconds: vmIdleTimeoutSeconds,
-      logger: console.log,
     });
     try {
       const authenticated = await vm.exec(withVmHome("gh auth status -h github.com >/dev/null 2>&1"));
@@ -225,14 +233,14 @@ export const dev = workflow(${workflowName})
       const snapshot = await vm.snapshot();
       return { ctx: { snapshotId: snapshot.snapshotId } };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   })
   .step("clone-hello-world", async ({ providers, step }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
       snapshotId: step.ctx.snapshotId,
+      firewall: vmFirewall,
       idleTimeoutSeconds: vmIdleTimeoutSeconds,
-      logger: console.log,
     });
     try {
       const clone = await vm.exec({
@@ -253,7 +261,7 @@ export const dev = workflow(${workflowName})
       const snapshot = await vm.snapshot();
       return { ctx: { snapshotId: snapshot.snapshotId, repoPath } };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   })
   .workspace({
@@ -261,8 +269,8 @@ export const dev = workflow(${workflowName})
       console.log("booting workspace vm");
       const { vmId } = await providers.freestyle.client.vms.create({
         snapshotId: workflow.ctx.snapshotId,
+        firewall: vmFirewall,
         idleTimeoutSeconds: vmIdleTimeoutSeconds,
-        logger: console.log,
       });
       return {
         vmId,
@@ -270,7 +278,7 @@ export const dev = workflow(${workflowName})
       };
     },
     remove: async ({ providers, workspace }) => {
-      await providers.freestyle.client.vms.delete({ vmId: workspace.ctx.vmId });
+      await providers.freestyle.client.vms.delete(workspace.ctx.vmId);
     },
   })
   .addProvider("cmux", cmux.provider())
