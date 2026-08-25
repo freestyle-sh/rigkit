@@ -14,6 +14,7 @@ import { cloneAndInstallTask } from "./tasks/clone-and-install";
 import { executeCodexTaskOperation } from "./tasks/execute-codex-task";
 import { githubAuthTask } from "./tasks/github-auth";
 import { initializeCodexCliTask } from "./tasks/initialize-codex-cli";
+import { setupVscodeTask, setupVscodeTaskVersion } from "./tasks/setup-vscode";
 import {
   installAptDependenciesTask,
   installJavaScriptToolsTask,
@@ -43,6 +44,7 @@ const websiteSetup = app
     { version: "system-dependency-verification-v2" },
     verifySystemDependenciesTask,
   )
+  .task("setup-vscode", { version: setupVscodeTaskVersion }, setupVscodeTask)
   .task("github-auth", { version: "github-auth-root-v6" }, githubAuthTask)
   .task(
     "clone-and-install",

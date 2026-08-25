@@ -122,6 +122,13 @@ export {
   type FreestyleLongExecResult,
   type FreestyleLongExecTarget,
 } from "./long-exec.ts";
+export {
+  detectLocalVscode,
+  installVscodeServerCommand,
+  parseVscodeVersionOutput,
+  type InstallVscodeServerCommandOptions,
+  type LocalVscode,
+} from "./vscode-server.ts";
 export { createFreestyleStore } from "./store.ts";
 export { createFreestyleTerminalSession } from "./terminal-session.ts";
 export { RIGKIT_PROVIDER_FREESTYLE_VERSION } from "./version.ts";
