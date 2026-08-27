@@ -1,6 +1,7 @@
 import {
-  devCommand,
-  devPort,
+  devAppCommand,
+  devAppPort,
+  devRouteName,
   repo,
   repoPath,
   repoUrl,
@@ -57,13 +58,20 @@ export const cloneAndInstallTask: SetupTaskHandler<
     });
 
     const snapshot = await vm.snapshot();
+    const devRoute = providers.portless.route({
+      name: devRouteName,
+      appPort: devAppPort,
+      command: devAppCommand,
+    });
     return {
       ctx: {
         snapshotId: snapshot.snapshotId,
         repoPath,
         repo,
-        devCommand,
-        devPort,
+        devCommand: devRoute.command,
+        devPort: devRoute.proxyPort,
+        devHostname: devRoute.hostname,
+        devUrl: devRoute.url,
       },
     };
   } finally {

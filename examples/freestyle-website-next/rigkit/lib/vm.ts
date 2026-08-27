@@ -41,15 +41,17 @@ export async function execOrThrow(
 export async function waitForLocalhostHtml(
   vm: Pick<FreestyleSdkVm, "exec">,
   port: number,
+  hostname = "localhost",
 ): Promise<void> {
   const url = `http://127.0.0.1:${port}/`;
-  await execOrThrow(vm, `Dev server did not return HTML on localhost:${port}`, {
+  const hostHeader = `Host: ${hostname}`;
+  await execOrThrow(vm, `Dev server did not return HTML on ${hostname}`, {
     command: [
       "set -e",
       "tmp_dir=$(mktemp -d)",
       "trap 'rm -rf \"$tmp_dir\"' EXIT",
       "for attempt in $(seq 1 120); do",
-      `  if curl -fsS --max-time 5 -o "$tmp_dir/body" ${shellQuote(url)} >/dev/null 2>&1; then`,
+      `  if curl -fsS --max-time 5 -H ${shellQuote(hostHeader)} -o "$tmp_dir/body" ${shellQuote(url)} >/dev/null 2>&1; then`,
       `    if grep -Eiq '<!doctype html|<html[[:space:]>]' "$tmp_dir/body"; then`,
       "      exit 0",
       "    fi",
@@ -57,7 +59,7 @@ export async function waitForLocalhostHtml(
       "  sleep 1",
       "done",
       "echo '--- dev server readiness diagnostics ---'",
-      `echo 'url: ${url}'`,
+      `echo 'url: ${url} (${hostHeader})'`,
       `echo 'pid file: ${devServerPidPath}'`,
       `if [ -f ${shellQuote(devServerPidPath)} ]; then pid=$(cat ${shellQuote(devServerPidPath)}); echo "pid: $pid"; ps -fp "$pid" || true; else echo 'pid file missing'; fi`,
       `echo 'metadata:'`,
@@ -67,7 +69,7 @@ export async function waitForLocalhostHtml(
       `echo 'dev server log tail:'`,
       `tail -n 200 ${shellQuote(devServerLogPath)} 2>/dev/null || echo 'dev server log missing'`,
       `echo 'final curl:'`,
-      `curl -i -sS --max-time 10 ${shellQuote(url)} | sed -n '1,80p' || true`,
+      `curl -i -sS --max-time 10 -H ${shellQuote(hostHeader)} ${shellQuote(url)} | sed -n '1,80p' || true`,
       "exit 1",
     ].join("\n"),
     timeoutMs: 125 * 1000,

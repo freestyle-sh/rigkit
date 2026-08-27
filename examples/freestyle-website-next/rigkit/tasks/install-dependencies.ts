@@ -54,7 +54,7 @@ export const installJavaScriptToolsTask: SetupTaskHandler<
   SnapshotContext,
   SnapshotContext
 > = async ({ step, providers }) => {
-  console.log("installing bun and codex");
+  console.log("installing bun, codex, and portless");
   return runSnapshotStage(providers, {
     snapshotId: step.ctx.snapshotId,
     label: "javascript tool install",

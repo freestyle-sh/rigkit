@@ -1,0 +1,88 @@
+---
+title: "Portless provider"
+description: "Give Rigkit development servers stable, named local URLs through Portless."
+figure: "providers"
+---
+
+The Portless provider describes how to launch a development server through
+[Portless](https://github.com/vercel-labs/portless). Its runtime returns the
+launch command, hostname, proxy port, and stable URL as JSON-safe values that a
+task can carry into a workspace.
+
+Portless must be installed wherever the generated launch command runs. The
+current Portless package requires Node.js 24 or newer.
+
+## Add the provider
+
+```ts
+import { portless } from "@rigkit/provider-portless";
+import { workflow } from "@rigkit/sdk";
+
+const app = workflow("website");
+
+export const website = app
+  .sequence("website")
+  .addProvider("portless", portless.provider());
+```
+
+The defaults use HTTPS on port 443 and `.localhost` names. For a root-owned
+remote development VM, HTTP on port 80 avoids moving the VM-local certificate
+authority into a browser on the developer machine:
+
+```ts
+const portlessProvider = portless.provider({
+  https: false,
+  proxyPort: 80,
+  syncHosts: false,
+});
+```
+
+## Create and launch a route
+
+Create the route in a task, then run its command in the same environment as the
+development server:
+
+```ts
+const route = providers.portless.route({
+  name: "website",
+  appPort: 4321,
+  command: "bun run dev -- --host 0.0.0.0 --port 4321",
+});
+
+await vm.exec(
+  `nohup ${route.command} </dev/null >/tmp/dev-server.log 2>&1 &`,
+);
+
+return {
+  ctx: {
+    devCommand: route.command,
+    devHostname: route.hostname,
+    devPort: route.proxyPort,
+    devUrl: route.url,
+  },
+};
+```
+
+This example produces `http://website.localhost` when used with the remote-VM
+configuration above. For a readiness probe that connects to
+`127.0.0.1:80`, send `Host: website.localhost` so Portless selects the route.
+
+When cmux opens an SSH workspace, its browser proxy sends the named URL through
+the remote VM. Portless therefore runs inside the VM alongside the development
+server, not on the developer's Mac.
+
+## Options
+
+```ts
+portless.provider({
+  command: "portless",
+  proxyPort: 443,
+  https: true,
+  tld: "localhost",
+  syncHosts: true,
+});
+```
+
+`route.name` and `tld` must contain valid lowercase DNS labels. A route command
+uses `--app-port` for the backend while the browser-facing URL uses the proxy's
+standard port.
