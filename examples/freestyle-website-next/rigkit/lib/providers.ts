@@ -13,10 +13,10 @@ export const portlessProvider = portless.provider({
 
 export type SetupProviders = {
   freestyle: typeof freestyleProvider;
-  terminal: typeof terminalProvider;
   portless: typeof portlessProvider;
 };
 
 export type WebsiteProviders = SetupProviders & {
+  terminal: typeof terminalProvider;
   cmux: typeof cmuxProvider;
 };

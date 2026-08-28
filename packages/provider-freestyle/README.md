@@ -7,6 +7,7 @@ This package supplies:
 - `freestyle.provider(...)` for host Freestyle authentication
 - `freestyle.terminal()` for provider-owned browser terminal sessions targeting Freestyle VMs
 - `providers.freestyle.client` for direct access to the authenticated Freestyle SDK client
+- `providers.freestyle.terminal.open(...)` for interactive browser terminals backed directly by the VM PTY API
 - `providers.freestyle.createSSHOptions(...)` for VM SSH connection options with provider-owned auth handled internally
 - `providers.freestyle.cmux.createSshOptions(...)` and `providers.freestyle.vscode.createUrl(...)` adapter helpers
 - Freestyle-specific JSON state helpers backed by Rigkit provider storage

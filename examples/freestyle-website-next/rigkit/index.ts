@@ -29,7 +29,6 @@ const app = workflow("freestyle-website-next");
 const websiteSetup = app
   .sequence("website-setup")
   .addProvider("freestyle", freestyleProvider)
-  .addProvider("terminal", terminalProvider)
   .addProvider("portless", portlessProvider)
   .task(
     "install-apt-dependencies",
@@ -47,7 +46,7 @@ const websiteSetup = app
     verifySystemDependenciesTask,
   )
   .task("setup-vscode", { version: setupVscodeTaskVersion }, setupVscodeTask)
-  .task("github-auth", { version: "github-auth-root-v6" }, githubAuthTask)
+  .task("github-auth", { version: "github-auth-root-pty-v2" }, githubAuthTask)
   .task(
     "clone-and-install",
     { version: "website-clone-and-install-portless-v5" },
@@ -55,7 +54,7 @@ const websiteSetup = app
   )
   .task(
     "initialize-codex-cli",
-    { version: "codex-cli-initialization-v1" },
+    { version: "codex-cli-initialization-pty-v1" },
     initializeCodexCliTask,
   )
   .task(

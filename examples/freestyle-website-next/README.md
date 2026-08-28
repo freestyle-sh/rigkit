@@ -9,11 +9,11 @@ The workflow:
 
 - installs Git, GitHub CLI, Node.js 24, Bun, Portless, and build tools
 - installs Codex CLI
-- runs the GitHub login flow in a browser terminal
+- runs the GitHub login flow in a browser terminal backed directly by the Freestyle VM PTY API
 - configures Git commit author identity from the authenticated GitHub account
 - clones `https://github.com/freestyle-sh/freestyle-website-next`
 - runs `bun install`
-- initializes Codex CLI from inside the cloned repo so its workspace trust and login prompts apply to the project folder
+- initializes Codex CLI over the same VM PTY from inside the cloned repo so its workspace trust and login prompts apply to the project folder
 - snapshots the warm VM with dependencies installed and Codex configured
 - passes Freestyle VM snapshot refs through JSON workflow context
 - on workspace creation, forks the snapshot, starts the website dev server through Portless as a detached background process, and waits for the named route to return HTML

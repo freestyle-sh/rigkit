@@ -137,6 +137,45 @@ describe("Freestyle provider host adapters", () => {
     });
   });
 
+  test("opens VM commands through the SDK PTY without creating SSH options", async () => {
+    let referencedVmId = "";
+    let html = "";
+    const vm = { pty: {} };
+    const runtime = await createFreestyleWorkflowController({
+      client: {
+        vms: {
+          ref: (vmId: string) => {
+            referencedVmId = vmId;
+            return vm;
+          },
+        },
+      } as unknown as Freestyle,
+      identityId: freestyleIdentityId("identity-stream"),
+      token: freestyleToken("token"),
+    }).runtime({
+      ...providerContext(),
+      interaction: {
+        present: async <Result>(session: ProviderInteractionSession<Result>) => {
+          html = await (await fetch(session.url)).text();
+          await session.stop();
+          return { finished: true } as Result;
+        },
+      },
+    });
+
+    await expect(runtime.terminal.open("Claude auth", {
+      vmId: "vm-pty",
+      command: "claude auth login",
+      instructions: "Sign in from this terminal.",
+    })).resolves.toEqual({ finished: true });
+
+    expect(referencedVmId).toBe("vm-pty");
+    expect(html).toContain("claude auth login");
+    expect(html).toContain("Sign in from this terminal.");
+    expect(html).toContain("const startupInput = null;");
+    expect(html).toContain("const canFinishWhileRunning = false;");
+  });
+
   test("runs terminal commands as SSH remote commands instead of typed startup input", async () => {
     let html = "";
     const runtime = await createFreestyleTerminalController().runtime({

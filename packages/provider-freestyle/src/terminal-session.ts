@@ -1,9 +1,17 @@
 import type { ServerWebSocket, Subprocess } from "bun";
 import type { ProviderInteractionSession } from "@rigkit/engine";
+import type { PtySession, Vm } from "freestyle";
+
+export type FreestylePtyTerminalTarget = {
+  vm: Vm;
+  linuxUser?: string;
+};
 
 export type FreestyleTerminalSessionRequest = {
   title: string;
   command: string;
+  /** Run the command through the VM agent's PTY instead of a local process. */
+  pty?: FreestylePtyTerminalTarget;
   displayCommand?: string;
   startupInput?: string;
   remoteCommand?: string;
@@ -37,6 +45,7 @@ export function createFreestyleTerminalSession(
   const token = crypto.randomUUID();
   let stopped = false;
   let processExitCode: number | undefined;
+  let processFailed = false;
   let settled = false;
   let remoteCommandStarted = false;
   let terminalCols = 100;
@@ -45,13 +54,18 @@ export function createFreestyleTerminalSession(
   let browserPromptOutputTail = "";
   let browserPromptOpenTimer: ReturnType<typeof setTimeout> | undefined;
   let proc: Subprocess<"pipe", "pipe", "pipe"> | undefined;
+  let ptySession: PtySession | undefined;
+  let ptyStarting = false;
+  const ptyDecoder = new TextDecoder();
   let stdin: { write(data: Uint8Array): unknown; flush?(): unknown } | undefined;
   let complete!: (result: FreestyleTerminalSessionResult) => void;
   let fail!: (error: Error) => void;
   const sockets = new Set<ServerWebSocket<SocketData>>();
   const outputBuffer: string[] = [];
   const openedExternalTargets = new Set<string>();
-  const startupCommand = request.startupInput ?? request.remoteCommand;
+  const startupCommand = request.pty
+    ? undefined
+    : request.startupInput ?? request.remoteCommand;
   const startupInput = startupCommand ? ensureTrailingNewline(startupCommand) : undefined;
   const displayCommand = request.displayCommand ?? request.remoteCommand ?? request.command;
   const canFinishWhileRunning = canFinishWhileProcessRuns(request, startupInput);
@@ -107,6 +121,7 @@ export function createFreestyleTerminalSession(
         if (message.type === "resize") {
           terminalCols = message.cols;
           terminalRows = message.rows;
+          ptySession?.resize({ cols: terminalCols, rows: terminalRows });
           return;
         }
         requestFinish();
@@ -123,23 +138,33 @@ export function createFreestyleTerminalSession(
     url: `http://127.0.0.1:${server.port}/?token=${encodeURIComponent(token)}`,
     instructions: request.instructions,
     completed,
-    stop: () => {
+    stop: async () => {
       if (stopped) return;
       stopped = true;
       clearTimeout(browserPromptOpenTimer);
       proc?.kill();
+      const remoteSession = ptySession;
+      remoteSession?.detach();
+      if (remoteSession) {
+        await request.pty?.vm.pty.close(remoteSession.sessionId).catch(() => {});
+      }
       server.stop(true);
     },
   };
 
   function startProcess(): void {
-    if (proc || processExitCode !== undefined) return;
+    if (proc || ptySession || ptyStarting || processExitCode !== undefined) return;
 
     broadcast({
       type: "status",
       status: "Connected",
       canFinish: canFinishWhileRunning,
     });
+
+    if (request.pty) {
+      startPty();
+      return;
+    }
 
     proc = Bun.spawn(["sh", "-lc", terminalProcessShellCommand(request.command)], {
       stdin: "pipe",
@@ -152,22 +177,76 @@ export function createFreestyleTerminalSession(
     pipeOutput(proc.stdout);
     pipeOutput(proc.stderr);
 
-    proc.exited.then((code) => {
-      processExitCode = code;
-      stdin = undefined;
-      appendOutput(`\r\n[shell exited ${code}]\r\n`);
-      if (settled || stopped) return;
-      if (code === 0) {
-        broadcast({ type: "status", status: "Shell exited", exitCode: code, canFinish: true });
-      } else {
-        const error = new Error(`Interactive command "${request.title}" exited ${code}`);
-        broadcast({ type: "status", status: error.message, exitCode: code, canFinish: false });
-        fail(error);
-      }
-    }).catch((error) => {
-      if (settled || stopped) return;
-      fail(error instanceof Error ? error : new Error(String(error)));
+    proc.exited.then(handleProcessExit).catch(handleProcessError);
+  }
+
+  async function startPty(): Promise<void> {
+    const target = request.pty;
+    if (!target) return;
+    ptyStarting = true;
+    remoteCommandStarted = true;
+    broadcast({
+      type: "status",
+      status: `Running ${displayCommand}`,
+      canFinish: canFinishWhileRunning,
     });
+
+    try {
+      const session = await target.vm.pty.open({
+        exec: request.command,
+        cols: terminalCols,
+        rows: terminalRows,
+        linuxUser: target.linuxUser,
+        onData: (data) => {
+          const text = ptyDecoder.decode(data, { stream: true });
+          if (text) handleProcessOutput(text);
+        },
+        onExit: (code) => {
+          const rest = ptyDecoder.decode();
+          if (rest) handleProcessOutput(rest);
+          handleProcessExit(code);
+        },
+        onClose: () => {
+          if (processExitCode === undefined && !settled && !stopped) {
+            handleProcessError(new Error("VM PTY connection closed before the command exited"));
+          }
+        },
+        onError: handleProcessError,
+      });
+      ptySession = session;
+      if (stopped) {
+        session.detach();
+        await target.vm.pty.close(session.sessionId).catch(() => {});
+      }
+    } catch (error) {
+      handleProcessError(error);
+    } finally {
+      ptyStarting = false;
+    }
+  }
+
+  function handleProcessExit(code: number): void {
+    if (processExitCode !== undefined) return;
+    processExitCode = code;
+    stdin = undefined;
+    appendOutput(`\r\n[shell exited ${code}]\r\n`);
+    if (settled || stopped) return;
+    if (code === 0) {
+      broadcast({ type: "status", status: "Shell exited", exitCode: code, canFinish: true });
+    } else {
+      const error = new Error(`Interactive command "${request.title}" exited ${code}`);
+      broadcast({ type: "status", status: error.message, exitCode: code, canFinish: false });
+      fail(error);
+    }
+  }
+
+  function handleProcessError(error: unknown): void {
+    if (settled || stopped || processFailed || processExitCode !== undefined) return;
+    processFailed = true;
+    const normalized = error instanceof Error ? error : new Error(String(error));
+    appendOutput(`\r\n[terminal error: ${normalized.message}]\r\n`);
+    broadcast({ type: "status", status: normalized.message, canFinish: false });
+    fail(normalized);
   }
 
   async function pipeOutput(stream: ReadableStream<Uint8Array>): Promise<void> {
@@ -218,6 +297,10 @@ export function createFreestyleTerminalSession(
 
   function writeProcessInput(data: string): void {
     try {
+      if (ptySession) {
+        ptySession.write(data);
+        return;
+      }
       stdin?.write(new TextEncoder().encode(data));
       stdin?.flush?.();
     } catch {
@@ -287,7 +370,11 @@ export function createFreestyleTerminalSession(
       send(ws, { type: "status", status: `Running ${displayCommand}`, canFinish: true });
       return;
     }
-    send(ws, { type: "status", status: proc ? "Connected" : "Starting", canFinish: canFinishWhileRunning });
+    send(ws, {
+      type: "status",
+      status: proc || ptySession || ptyStarting ? "Connected" : "Starting",
+      canFinish: canFinishWhileRunning,
+    });
   }
 
   function broadcast(message: ServerMessage): void {

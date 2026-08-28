@@ -130,7 +130,12 @@ export {
   type LocalVscode,
 } from "./vscode-server.ts";
 export { createFreestyleStore } from "./store.ts";
-export { createFreestyleTerminalSession } from "./terminal-session.ts";
+export {
+  createFreestyleTerminalSession,
+  type FreestylePtyTerminalTarget,
+  type FreestyleTerminalSessionRequest,
+  type FreestyleTerminalSessionResult,
+} from "./terminal-session.ts";
 export { RIGKIT_PROVIDER_FREESTYLE_VERSION } from "./version.ts";
 export { Freestyle, FreestyleApiError } from "freestyle";
 export type { CreateVmOptions, FirewallSpec, VmData, VmResources } from "freestyle";

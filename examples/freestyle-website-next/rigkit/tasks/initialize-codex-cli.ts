@@ -16,10 +16,10 @@ export const initializeCodexCliTask: SetupTaskHandler<
   const { vm } = created;
 
   try {
-    await providers.terminal.open("Initialize Codex CLI", {
-      ssh: await providers.freestyle.createSSHOptions({ vmId }),
+    await providers.freestyle.terminal.open("Initialize Codex CLI", {
+      vmId,
       command: agentCliInitCommand("codex"),
-      keepOpenAfterCommand: true,
+      canFinishWhileRunning: true,
       instructions:
         "Codex CLI is running inside the cloned website repo. Complete the login and workspace trust prompts, then exit Codex or click Complete task.",
     });

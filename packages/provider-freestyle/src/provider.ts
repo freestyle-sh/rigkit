@@ -4,6 +4,7 @@ import type {
   SshOptions,
   WorkflowProviderCheckResult,
   WorkflowProviderController,
+  ProviderRuntimeContext,
 } from "@rigkit/engine";
 import type { CmuxSshInput } from "@rigkit/provider-cmux";
 import type { FreestyleIdentityId, FreestyleToken } from "./auth.ts";
@@ -35,6 +36,18 @@ export type FreestyleVscodeUrlOptions = FreestyleSshInput & {
 
 export type FreestyleRuntime = {
   readonly client: Freestyle;
+  terminal: {
+    open(
+      title: string,
+      options: {
+        vmId: string;
+        command: string;
+        linuxUser?: string;
+        canFinishWhileRunning?: boolean;
+        instructions?: string;
+      },
+    ): Promise<{ finished: true }>;
+  };
   createSSHOptions(input: FreestyleSshInput): Promise<SshConnection>;
   cmux: {
     createSshOptions(
@@ -92,8 +105,8 @@ export function createFreestyleWorkflowController(input: {
         },
       };
     },
-    runtime() {
-      return createFreestyleRuntime(input);
+    runtime(context) {
+      return createFreestyleRuntime(input, context);
     },
   };
 }
@@ -112,9 +125,9 @@ export function createLazyFreestyleWorkflowController(input: {
   return {
     providerId: FREESTYLE_PROVIDER_ID,
     checks: input.checks,
-    async runtime() {
+    async runtime(context) {
       const authenticated = await input.authenticate();
-      return createFreestyleRuntime(authenticated);
+      return createFreestyleRuntime(authenticated, context);
     },
   };
 }
@@ -152,7 +165,7 @@ function createFreestyleRuntime(input: {
   client: Freestyle;
   identityId: FreestyleIdentityId;
   token: FreestyleToken;
-}): FreestyleRuntime {
+}, context: ProviderRuntimeContext): FreestyleRuntime {
   const ensureSSHAccess = async (vmId: string) => {
     const identity = input.client.identities.ref(input.identityId);
     try {
@@ -167,6 +180,24 @@ function createFreestyleRuntime(input: {
 
   const runtime: FreestyleRuntime = {
     client: input.client,
+    terminal: {
+      open: async (title, options) => {
+        const session = createFreestyleTerminalSession({
+          title,
+          command: withBrowserOpenFallback(options.command),
+          displayCommand: options.command,
+          pty: {
+            vm: input.client.vms.ref(options.vmId),
+            linuxUser: options.linuxUser,
+          },
+          canFinishWhileRunning: options.canFinishWhileRunning,
+          instructions: options.instructions,
+          nodePath: context.nodePath,
+          openExternalTarget: (target) => context.local.open(target),
+        });
+        return await context.interaction.present(session);
+      },
+    },
     createSSHOptions: async ({ vmId, user }) => {
       await ensureSSHAccess(vmId);
       return freestyleSshConnection(vmId, input.token, user);

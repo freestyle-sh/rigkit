@@ -24,13 +24,13 @@ export const githubAuthTask: SetupTaskHandler<
       withVmHome("gh auth status -h github.com >/dev/null 2>&1"),
     );
     if ((authenticated.statusCode ?? 0) !== 0) {
-      await providers.terminal.open("Log in to GitHub", {
-        ssh: await providers.freestyle.createSSHOptions({ vmId }),
-        command:
+      await providers.freestyle.terminal.open("Log in to GitHub", {
+        vmId,
+        command: withVmHome(
           "gh auth login --hostname github.com --git-protocol https --web",
-        keepOpenAfterCommand: true,
+        ),
         instructions:
-          "Complete the GitHub device/browser login in this terminal. After gh succeeds, inspect the shell if needed, then type exit.",
+          "Complete the GitHub device/browser login in this terminal. The task will be ready to continue when gh exits successfully.",
       });
 
       const verified = await vm.exec(
