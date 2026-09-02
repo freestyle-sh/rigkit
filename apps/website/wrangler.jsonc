@@ -21,6 +21,10 @@
     {
       "binding": "DOCS_LATEST",
       "service": "rigkit-docs"
+    },
+    {
+      "binding": "DOCS_V0_2",
+      "service": "rigkit-docs-v0-2"
     }
   ],
   "vars": {

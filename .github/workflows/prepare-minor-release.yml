@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Prepare minor release 0.3.0 from main"
+        description: "Prepare minor release 0.4.0 from main"
         required: true
         type: choice
         options:
-          - "0.3.0"
+          - "0.4.0"
 
 permissions:
   contents: write
