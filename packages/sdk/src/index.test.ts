@@ -15,7 +15,7 @@ import { defineHostCapabilities, defineHostCapability } from "./host.ts";
 
 describe("@rigkit/sdk package boundary", () => {
   test("exports authoring API and project runtime entrypoints", () => {
-    expect(RIGKIT_SDK_VERSION).toBe("0.2.17");
+    expect(RIGKIT_SDK_VERSION).toBe("0.3.0");
     expect(env).toBeTypeOf("function");
     expect(env.secret).toBeTypeOf("function");
     expect(sequence).toBeTypeOf("function");

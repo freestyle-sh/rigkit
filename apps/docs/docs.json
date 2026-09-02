@@ -1,7 +1,7 @@
 {
   "name": "Rigkit",
   "description": "Declarative dev environments, in TypeScript.",
-  "version": "v0.2.17",
+  "version": "v0.3.0",
   "tag": "Latest",
   "navigation": {
     "pages": [
