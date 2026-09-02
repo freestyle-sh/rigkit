@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { PtyOpenOptions, PtySession, PtySessionEvents, Vm } from "freestyle";
 import { createFreestyleTerminalSession } from "./terminal-session.ts";
 
 describe("Freestyle terminal session", () => {
@@ -284,6 +285,87 @@ describe("Freestyle terminal session", () => {
     } finally {
       session.stop();
     }
+  });
+
+  test("bridges browser input, output, and resize directly to a VM PTY", async () => {
+    type OpenOptions = PtyOpenOptions & PtySessionEvents;
+    let openOptions: OpenOptions | undefined;
+    const writes: string[] = [];
+    const resizes: Array<{ cols: number; rows: number }> = [];
+    const closed: number[] = [];
+    let detached = false;
+    const remoteSession = {
+      sessionId: 42,
+      write: (data: Uint8Array | string) => {
+        writes.push(typeof data === "string" ? data : new TextDecoder().decode(data));
+      },
+      resize: (size: { cols: number; rows: number }) => {
+        resizes.push(size);
+      },
+      detach: () => {
+        detached = true;
+      },
+    } as unknown as PtySession;
+    const vm = {
+      pty: {
+        open: async (options: OpenOptions) => {
+          openOptions = options;
+          options.onData?.(new TextEncoder().encode("remote-ready\r\n"));
+          return remoteSession;
+        },
+        close: async (sessionId: number) => {
+          closed.push(sessionId);
+          return { sessionId };
+        },
+      },
+    } as unknown as Vm;
+    const session = createFreestyleTerminalSession({
+      nodePath: "login",
+      title: "Direct PTY",
+      command: "claude auth login",
+      displayCommand: "claude auth login",
+      pty: { vm },
+    });
+
+    const messages: unknown[] = [];
+    const socketUrl = new URL(session.url.replace("/?", "/terminal?"));
+    socketUrl.protocol = "ws:";
+    const socket = new WebSocket(socketUrl);
+    socket.addEventListener("message", (event) => {
+      messages.push(JSON.parse(String(event.data)));
+    });
+
+    try {
+      await waitFor(() => openOptions !== undefined);
+      expect(openOptions?.exec).toBe("claude auth login");
+      expect(openOptions?.cols).toBe(100);
+      expect(openOptions?.rows).toBe(28);
+      await waitFor(() =>
+        messages.some((message) =>
+          isMessage(message, "output") && message.data.includes("remote-ready")
+        ),
+      );
+
+      socket.send(JSON.stringify({ type: "input", data: "yes\n" }));
+      socket.send(JSON.stringify({ type: "resize", cols: 132, rows: 43 }));
+      await waitFor(() => writes.includes("yes\n") && resizes.length > 0);
+      expect(resizes.at(-1)).toEqual({ cols: 132, rows: 43 });
+
+      openOptions?.onExit?.(0);
+      await waitFor(() =>
+        messages.some((message) =>
+          isMessage(message, "status") && message.status === "Shell exited" && message.canFinish
+        ),
+      );
+      socket.send(JSON.stringify({ type: "finish" }));
+      await expect(session.completed).resolves.toEqual({ finished: true });
+    } finally {
+      socket.close();
+      await session.stop();
+    }
+
+    expect(detached).toBe(true);
+    expect(closed).toEqual([42]);
   });
 
   test("asks the host to open complete browser auth URLs printed by the terminal", async () => {

@@ -1,56 +1,60 @@
-import { env, workflow, z } from "@rigkit/sdk";
+import { workflow, z } from "@rigkit/sdk";
 import {
   attachDevServerLogCommand,
   startDevServerCommand,
 } from "./lib/commands";
-import { vmIdleTimeoutSeconds } from "./lib/config";
+import { vmFirewall, vmIdleTimeoutSeconds } from "./lib/config";
 import {
   cmuxProvider,
   freestyleProvider,
+  portlessProvider,
   terminalProvider,
 } from "./lib/providers";
 import { shellQuote } from "./lib/shell";
-import { execOrThrow, waitForLocalhostHtml } from "./lib/vm";
 import { cloneAndInstallTask } from "./tasks/clone-and-install";
 import { executeCodexTaskOperation } from "./tasks/execute-codex-task";
 import { githubAuthTask } from "./tasks/github-auth";
 import { initializeCodexCliTask } from "./tasks/initialize-codex-cli";
+import { setupVscodeTask, setupVscodeTaskVersion } from "./tasks/setup-vscode";
 import {
   installAptDependenciesTask,
   installJavaScriptToolsTask,
   verifySystemDependenciesTask,
 } from "./tasks/install-dependencies";
 import { updateCodexCliAndEnableGoalTask } from "./tasks/update-codex-cli-and-enable-goal";
+import { execOrThrow, waitForLocalhostHtml } from "./lib/vm";
 
 const app = workflow("freestyle-website-next");
 
 const websiteSetup = app
   .sequence("website-setup")
   .addProvider("freestyle", freestyleProvider)
-  .addProvider("terminal", terminalProvider)
-  .configure({
-    CODEX_API_KEY: env("CODEX_API_KEY"),
-  })
+  .addProvider("portless", portlessProvider)
   .task(
     "install-apt-dependencies",
-    { version: "apt-dependencies-node22-v2" },
+    { version: "apt-dependencies-node24-v3" },
     installAptDependenciesTask,
   )
   .task(
     "install-javascript-tools",
-    { version: "javascript-tools-node22-v3" },
+    { version: "javascript-tools-node24-portless-v4" },
     installJavaScriptToolsTask,
   )
   .task(
     "verify-system-dependencies",
-    { version: "system-dependency-verification-v2" },
+    { version: "system-dependency-verification-v3" },
     verifySystemDependenciesTask,
   )
-  .task("github-auth", { version: "github-auth-root-v6" }, githubAuthTask)
-  .task("clone-and-install", cloneAndInstallTask)
+  .task("setup-vscode", { version: setupVscodeTaskVersion }, setupVscodeTask)
+  .task("github-auth", { version: "github-auth-root-pty-v2" }, githubAuthTask)
+  .task(
+    "clone-and-install",
+    { version: "website-clone-and-install-portless-v5" },
+    cloneAndInstallTask,
+  )
   .task(
     "initialize-codex-cli",
-    { version: "codex-cli-initialization-v1" },
+    { version: "codex-cli-initialization-pty-v1" },
     initializeCodexCliTask,
   )
   .task(
@@ -64,10 +68,12 @@ export const freestyleWebsiteNext = app
   .add(websiteSetup)
   .addProvider("freestyle", freestyleProvider)
   .addProvider("terminal", terminalProvider)
+  .addProvider("portless", portlessProvider)
   .workspace({
     create: async ({ workflow, providers, workspace }) => {
       const created = await providers.freestyle.client.vms.create({
         snapshotId: workflow.ctx.snapshotId,
+        firewall: vmFirewall,
         idleTimeoutSeconds: vmIdleTimeoutSeconds,
       });
       const { vmId } = created;
@@ -95,7 +101,11 @@ export const freestyleWebsiteNext = app
           }),
           timeoutMs: 60 * 1000,
         });
-        await waitForLocalhostHtml(vm, workflow.ctx.devPort);
+        await waitForLocalhostHtml(
+          vm,
+          workflow.ctx.devPort,
+          workflow.ctx.devHostname,
+        );
         return {
           vmId,
           repoPath: workflow.ctx.repoPath,
@@ -103,14 +113,16 @@ export const freestyleWebsiteNext = app
           branch,
           devCommand: workflow.ctx.devCommand,
           devPort: workflow.ctx.devPort,
+          devHostname: workflow.ctx.devHostname,
+          devUrl: workflow.ctx.devUrl,
         };
       } catch (error) {
-        await providers.freestyle.client.vms.delete({ vmId });
+        await providers.freestyle.client.vms.delete(vmId);
         throw error;
       }
     },
     remove: async ({ providers, workspace }) => {
-      await providers.freestyle.client.vms.delete({ vmId: workspace.ctx.vmId });
+      await providers.freestyle.client.vms.delete(workspace.ctx.vmId);
     },
   })
   .addProvider("cmux", cmuxProvider)
@@ -127,7 +139,7 @@ export const freestyleWebsiteNext = app
       await providers.cmux.newSurface({
         workspace: cmuxWorkspace.workspaceId,
         type: "browser",
-        url: `http://localhost:${workspace.ctx.devPort}`,
+        url: workspace.ctx.devUrl,
         focus: true,
       });
       const devTerminal = await providers.cmux.newSurface({

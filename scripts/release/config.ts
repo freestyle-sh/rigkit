@@ -47,6 +47,12 @@ export const releasePackages: ReleasePackage[] = [
     versionConstant: "RIGKIT_PROVIDER_GCLOUD_CLI_VERSION",
   },
   {
+    name: "@rigkit/provider-portless",
+    dir: "packages/provider-portless",
+    versionFile: "packages/provider-portless/src/version.ts",
+    versionConstant: "RIGKIT_PROVIDER_PORTLESS_VERSION",
+  },
+  {
     name: "@rigkit/provider-vscode",
     dir: "packages/provider-vscode",
     versionFile: "packages/provider-vscode/src/version.ts",

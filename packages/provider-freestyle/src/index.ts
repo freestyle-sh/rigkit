@@ -8,7 +8,6 @@ import { freestyleIdentityId, freestyleToken, freestyleTokenId } from "./auth.ts
 import {
   checkFreestyleProviderAuth,
   createFreestyleAuthenticatedClient,
-  createFreestyleProxyFetch,
   freestyleProviderChecksFromAuthenticated,
   type FreestyleProviderConfig,
 } from "./host-auth.ts";
@@ -96,7 +95,6 @@ export const freestyleTerminalPlugin: BaseProviderPlugin = {
 export {
   checkFreestyleProviderAuth,
   createFreestyleAuthenticatedClient,
-  createFreestyleProxyFetch,
   createFreestyleSdkFetch,
   freestyleProviderChecksFromAuthenticated,
 } from "./host-auth.ts";
@@ -110,17 +108,37 @@ export {
 } from "./auth.ts";
 export {
   FREESTYLE_PROVIDER_ID,
+  FREESTYLE_SSH_HOST,
   FREESTYLE_TERMINAL_PROVIDER_ID,
   createFreestyleTerminalController,
   createLazyFreestyleWorkflowController,
   createFreestyleWorkflowController,
   createFreestyleWorkflowProvider,
 } from "./provider.ts";
+export {
+  FREESTYLE_EXEC_TIMEOUT_CAP_MS,
+  execLongCommand,
+  type FreestyleLongExecOptions,
+  type FreestyleLongExecResult,
+  type FreestyleLongExecTarget,
+} from "./long-exec.ts";
+export {
+  detectLocalVscode,
+  installVscodeServerCommand,
+  parseVscodeVersionOutput,
+  type InstallVscodeServerCommandOptions,
+  type LocalVscode,
+} from "./vscode-server.ts";
 export { createFreestyleStore } from "./store.ts";
-export { createFreestyleTerminalSession } from "./terminal-session.ts";
+export {
+  createFreestyleTerminalSession,
+  type FreestylePtyTerminalTarget,
+  type FreestyleTerminalSessionRequest,
+  type FreestyleTerminalSessionResult,
+} from "./terminal-session.ts";
 export { RIGKIT_PROVIDER_FREESTYLE_VERSION } from "./version.ts";
-export { Freestyle } from "freestyle";
-export type { CreateVmOptions } from "freestyle";
+export { Freestyle, FreestyleApiError } from "freestyle";
+export type { CreateVmOptions, FirewallSpec, VmData, VmResources } from "freestyle";
 export type {
   FreestyleCmuxSshOptions,
   FreestyleCmuxSshOptionsInput,

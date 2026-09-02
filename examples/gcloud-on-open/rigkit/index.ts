@@ -1,11 +1,16 @@
 import { workflow } from "@rigkit/sdk";
-import { freestyle } from "@rigkit/provider-freestyle";
+import { execLongCommand, freestyle, type FirewallSpec } from "@rigkit/provider-freestyle";
 import {
   copyGcloudConfig,
   gcloudCopiedConfigReadyCommand,
 } from "@rigkit/provider-gcloud-cli";
 
 const vmIdleTimeoutSeconds = 3600;
+// A Freestyle VM reaches nothing it has not been allowed to; the installs
+// below need the public internet.
+const vmFirewall: FirewallSpec = {
+  rules: [{ action: "allow", source: {}, destination: { public: true } }],
+};
 
 const app = workflow("gcloud-on-open");
 const freestyleProvider = freestyle.provider();
@@ -18,24 +23,24 @@ const baseVm = app
   .addProvider("freestyle", freestyleProvider)
   .task("install-dependencies", async ({ providers }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
+      firewall: vmFirewall,
       idleTimeoutSeconds: vmIdleTimeoutSeconds,
-      memSizeGb: 16,
-      vcpuCount: 4,
-      logger: console.log,
     });
     try {
+      await vm.resize({ memory: 16 * 1024 });
       console.log("installing gcloud cli");
-      const result = await vm.exec({
+      const result = await execLongCommand(vm, {
         command: installGcloudCliCommand(),
         timeoutMs: 10 * 60 * 1000,
+        onOutput: (chunk) => console.log(chunk.trimEnd()),
       });
-      if ((result.statusCode ?? 0) !== 0) {
-        throw new Error(`gcloud cli install failed:\n${result.stdout ?? ""}${result.stderr ?? ""}`.trim());
+      if (result.timedOut || (result.statusCode ?? 0) !== 0) {
+        throw new Error(`gcloud cli install ${result.timedOut ? "timed out" : "failed"}:\n${result.stdout}`.trim());
       }
       const snapshot = await vm.snapshot();
       return { ctx: { snapshotId: snapshot.snapshotId } };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   });
 
@@ -58,18 +63,18 @@ export const gcloudOnOpen = app
       const gcloudConfigFiles = await providers.gcloudConfig.configFiles();
       const { vm, vmId } = await providers.freestyle.client.vms.create({
         snapshotId: workflow.ctx.snapshotId,
+        firewall: vmFirewall,
         idleTimeoutSeconds: vmIdleTimeoutSeconds,
-        logger: console.log,
       });
 
       try {
         console.log("copying local gcloud config");
-        await vm.fs.remove("/root/.config/gcloud", true).catch(() => {});
-        await vm.fs.mkdir("/root/.config/gcloud", true);
+        await vm.fs.remove("/root/.config/gcloud").catch(() => {});
+        await vm.fs.mkdir("/root/.config/gcloud");
         for (const file of gcloudConfigFiles.files) {
           const path = `/root/.config/gcloud/${file.path}`;
           const dir = path.slice(0, path.lastIndexOf("/"));
-          await vm.fs.mkdir(dir, true);
+          await vm.fs.mkdir(dir);
           await vm.fs.writeFile(path, Buffer.from(file.contentsBase64, "base64"));
           await vm.exec(`chmod 600 ${shellQuote(path)}`);
         }
@@ -96,12 +101,12 @@ export const gcloudOnOpen = app
 
         return { vmId };
       } catch (error) {
-        await providers.freestyle.client.vms.delete({ vmId });
+        await providers.freestyle.client.vms.delete(vmId);
         throw error;
       }
     },
     remove: async ({ providers, workspace }) => {
-      await providers.freestyle.client.vms.delete({ vmId: workspace.ctx.vmId });
+      await providers.freestyle.client.vms.delete(workspace.ctx.vmId);
     },
   })
   .workspaceOperation("ssh", {

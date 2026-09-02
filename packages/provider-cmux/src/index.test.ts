@@ -448,7 +448,7 @@ describe("cmux sdk", () => {
       method: "ssh",
       params: {
         kind: "ssh",
-        destination: "vm_123,token_123@vm-ssh.freestyle.sh",
+        destination: "vm_123,token_123@beta-ssh.freestyle.sh",
         name: "website",
         sshOptions: ["ServerAliveInterval=15"],
       },
@@ -490,7 +490,7 @@ describe("cmux sdk", () => {
       {
         method: "ssh",
         params: expect.objectContaining({
-          destination: "vm_123,token_123@vm-ssh.freestyle.sh",
+          destination: "vm_123,token_123@beta-ssh.freestyle.sh",
           name: "website",
           sshOptions: ["ServerAliveInterval=15"],
         }),
@@ -542,18 +542,18 @@ describe("cmux sdk", () => {
       method: "ssh",
       params: {
         kind: "ssh",
-        destination: "vm_123,token_123@vm-ssh.freestyle.sh",
+        destination: "vm_123,token_123@beta-ssh.freestyle.sh",
         name: "website",
-        terminalStartupCommand: "ssh -tt vm_123:token_123@vm-ssh.freestyle.sh",
+        terminalStartupCommand: "ssh -tt vm_123:token_123@beta-ssh.freestyle.sh",
       },
     }, { client });
 
     expect(calls[0]).toEqual({
       method: "ssh",
       params: expect.objectContaining({
-        destination: "vm_123,token_123@vm-ssh.freestyle.sh",
+        destination: "vm_123,token_123@beta-ssh.freestyle.sh",
         name: "website",
-        terminalStartupCommand: "ssh -tt vm_123:token_123@vm-ssh.freestyle.sh",
+        terminalStartupCommand: "ssh -tt vm_123:token_123@beta-ssh.freestyle.sh",
       }),
     });
   });
@@ -593,7 +593,7 @@ describe("cmux sdk", () => {
     }) as CmuxRuntime;
 
     const workspace = await runtime.ssh({
-      destination: "vm_123,token_123@vm-ssh.freestyle.sh",
+      destination: "vm_123,token_123@beta-ssh.freestyle.sh",
       name: "workspace",
     });
     const terminal = await runtime.newSurface({
@@ -613,7 +613,7 @@ describe("cmux sdk", () => {
         params: {
           method: "ssh",
           params: {
-            destination: "vm_123,token_123@vm-ssh.freestyle.sh",
+            destination: "vm_123,token_123@beta-ssh.freestyle.sh",
             name: "workspace",
           },
         },

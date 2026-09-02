@@ -1,5 +1,5 @@
 import { agentCliInitCommand } from "../lib/commands";
-import { vmIdleTimeoutSeconds } from "../lib/config";
+import { vmFirewall, vmIdleTimeoutSeconds } from "../lib/config";
 import type { WebsiteContext } from "../lib/types";
 import type { SetupTaskHandler } from "./types";
 
@@ -9,17 +9,17 @@ export const initializeCodexCliTask: SetupTaskHandler<
 > = async ({ step, providers }) => {
   const created = await providers.freestyle.client.vms.create({
     snapshotId: step.ctx.snapshotId,
+    firewall: vmFirewall,
     idleTimeoutSeconds: vmIdleTimeoutSeconds,
-    logger: console.log,
   });
   const { vmId } = created;
   const { vm } = created;
 
   try {
-    await providers.terminal.open("Initialize Codex CLI", {
-      ssh: await providers.freestyle.createSSHOptions({ vmId }),
+    await providers.freestyle.terminal.open("Initialize Codex CLI", {
+      vmId,
       command: agentCliInitCommand("codex"),
-      keepOpenAfterCommand: true,
+      canFinishWhileRunning: true,
       instructions:
         "Codex CLI is running inside the cloned website repo. Complete the login and workspace trust prompts, then exit Codex or click Complete task.",
     });
@@ -32,6 +32,6 @@ export const initializeCodexCliTask: SetupTaskHandler<
       },
     };
   } finally {
-    await providers.freestyle.client.vms.delete({ vmId });
+    await providers.freestyle.client.vms.delete(vmId);
   }
 };

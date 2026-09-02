@@ -1,9 +1,11 @@
 import {
-  devCommand,
-  devPort,
+  devAppCommand,
+  devAppPort,
+  devRouteName,
   repo,
   repoPath,
   repoUrl,
+  vmFirewall,
   vmHome,
   vmIdleTimeoutSeconds,
 } from "../lib/config";
@@ -18,8 +20,8 @@ export const cloneAndInstallTask: SetupTaskHandler<
 > = async ({ step, providers }) => {
   const created = await providers.freestyle.client.vms.create({
     snapshotId: step.ctx.snapshotId,
+    firewall: vmFirewall,
     idleTimeoutSeconds: vmIdleTimeoutSeconds,
-    logger: console.log,
   });
   const { vmId } = created;
   const { vm } = created;
@@ -45,6 +47,7 @@ export const cloneAndInstallTask: SetupTaskHandler<
       command: [
         "set -e",
         `export HOME=${shellQuote(vmHome)}`,
+        "export GIT_TERMINAL_PROMPT=0",
         `cd ${shellQuote(repoPath)}`,
         `git remote set-url origin ${shellQuote(repoUrl)}`,
         "git fetch --prune origin",
@@ -55,16 +58,23 @@ export const cloneAndInstallTask: SetupTaskHandler<
     });
 
     const snapshot = await vm.snapshot();
+    const devRoute = providers.portless.route({
+      name: devRouteName,
+      appPort: devAppPort,
+      command: devAppCommand,
+    });
     return {
       ctx: {
         snapshotId: snapshot.snapshotId,
         repoPath,
         repo,
-        devCommand,
-        devPort,
+        devCommand: devRoute.command,
+        devPort: devRoute.proxyPort,
+        devHostname: devRoute.hostname,
+        devUrl: devRoute.url,
       },
     };
   } finally {
-    await providers.freestyle.client.vms.delete({ vmId });
+    await providers.freestyle.client.vms.delete(vmId);
   }
 };

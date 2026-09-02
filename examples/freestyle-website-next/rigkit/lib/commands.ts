@@ -22,14 +22,14 @@ printf 'deb [arch=%s signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] 
 
 rm -f /etc/apt/keyrings/nodesource.gpg
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-printf 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main\\n' > /etc/apt/sources.list.d/nodesource.list
+printf 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main\\n' > /etc/apt/sources.list.d/nodesource.list
 
 apt-get update -qq
 apt-get install -y -qq build-essential ca-certificates curl gh git gnupg pkg-config python3 unzip xz-utils
 
-nodejs_version=$(apt-cache madison nodejs | awk '$3 ~ /^22[.]/ { print $3; exit }')
+nodejs_version=$(apt-cache madison nodejs | awk '$3 ~ /^24[.]/ { print $3; exit }')
 if [ -z "$nodejs_version" ]; then
-  echo "could not find a Node.js 22.x package candidate" >&2
+  echo "could not find a Node.js 24.x package candidate" >&2
   apt-cache policy nodejs >&2
   exit 1
 fi
@@ -51,8 +51,8 @@ git config --system init.defaultBranch main
 node_version=$(node --version)
 echo "using Node.js $node_version from $(command -v node)"
 case "$node_version" in
-  v22.*) ;;
-  *) echo "expected Node.js v22.x, got $node_version" >&2; exit 1 ;;
+  v24.*) ;;
+  *) echo "expected Node.js v24.x, got $node_version" >&2; exit 1 ;;
 esac
 
 rm -rf /var/lib/apt/lists/*
@@ -73,8 +73,8 @@ echo "verifying node"
 node_version=$(node --version)
 echo "$node_version"
 case "$node_version" in
-  v22.*) ;;
-  *) echo "expected Node.js v22.x, got $node_version" >&2; exit 1 ;;
+  v24.*) ;;
+  *) echo "expected Node.js v24.x, got $node_version" >&2; exit 1 ;;
 esac
 
 echo "installing bun"
@@ -83,9 +83,15 @@ BUN_INSTALL=/opt/bun bash "$tmp_dir/install-bun.sh"
 ln -sf /opt/bun/bin/bun /usr/local/bin/bun
 
 echo "installing codex"
+# The Freestyle base image ships codex preinstalled as a symlink into its own
+# node; remove it so npm can link the pinned install without EEXIST.
+rm -f /usr/local/bin/codex
 npm install -g @openai/codex
 mkdir -p /root/.codex
 printf 'cli_auth_credentials_store = "file"\\n' > /root/.codex/config.toml
+
+echo "installing portless"
+npm install -g portless@0.15.6
 
 echo "verifying bun"
 command -v bun
@@ -94,6 +100,10 @@ bun --version
 echo "verifying codex"
 command -v codex
 codex --version
+
+echo "verifying portless"
+command -v portless
+portless --version
 `;
 }
 
@@ -106,9 +116,11 @@ export PATH="/usr/local/bin:/root/.local/bin:/opt/bun/bin:$PATH"
 command -v node
 command -v bun
 command -v codex
-node --version | grep -E '^v22\\.'
+command -v portless
+node --version | grep -E '^v24\\.'
 bun --version
 codex --version
+portless --version
 `;
 }
 
@@ -212,6 +224,7 @@ export function startDevServerCommand(options: {
     `cd ${shellQuote(options.repoPath)}`,
     `if [ -f ${shellQuote(devServerPidPath)} ]; then kill "$(cat ${shellQuote(devServerPidPath)})" 2>/dev/null || true; fi`,
     `: > ${shellQuote(devServerLogPath)}`,
+    `printf 'started_at=%s\nrepo=%s\ncommand=%s\n' "$(date -Is)" ${shellQuote(options.repoPath)} ${shellQuote(options.command)} > ${shellQuote(devServerLogPath)}.meta`,
     `nohup ${options.command} </dev/null >${shellQuote(devServerLogPath)} 2>&1 &`,
     `echo $! > ${shellQuote(devServerPidPath)}`,
     `echo "dev server started (pid $(cat ${shellQuote(devServerPidPath)}))"`,

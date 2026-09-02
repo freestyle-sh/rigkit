@@ -1,12 +1,12 @@
 {
-  "name": "@rigkit/provider-freestyle",
+  "name": "@rigkit/provider-portless",
   "version": "0.2.17",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/freestyle-sh/rigkit.git",
-    "directory": "packages/provider-freestyle"
+    "directory": "packages/provider-portless"
   },
   "exports": {
     ".": "./src/index.ts",
@@ -24,16 +24,11 @@
   "dependencies": {
     "@rigkit/sdk": "workspace:*",
     "@rigkit/engine": "workspace:*",
-    "@rigkit/provider-cmux": "workspace:*",
     "zod": "^4"
   },
-  "peerDependencies": {
-    "freestyle": "^0.2.2"
-  },
   "devDependencies": {
-    "@types/bun": "latest",
-    "freestyle": "^0.2.2",
-    "typescript": "latest"
+    "@types/bun": "1.3.14",
+    "typescript": "6.0.3"
   },
   "publishConfig": {
     "access": "public"

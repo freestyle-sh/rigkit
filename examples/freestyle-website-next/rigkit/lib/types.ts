@@ -7,6 +7,8 @@ export type WebsiteContext = SnapshotContext & {
   repo: string;
   devCommand: string;
   devPort: number;
+  devHostname: string;
+  devUrl: string;
 };
 
 export type WebsiteWorkspaceContext = Omit<WebsiteContext, "snapshotId"> & {

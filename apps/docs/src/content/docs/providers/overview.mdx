@@ -23,7 +23,10 @@ export const website = app
   .addProvider("terminal", freestyle.terminal())
   .task("prepare", async ({ providers }) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
-      logger: console.log,
+      // A Freestyle VM reaches nothing it has not been allowed to.
+      firewall: {
+        rules: [{ action: "allow", source: {}, destination: { public: true } }],
+      },
     });
     // ...
   })
@@ -48,6 +51,7 @@ export const website = app
 | [Freestyle](/providers/freestyle) | `@rigkit/provider-freestyle` | VMs, snapshots, SSH, cmux adapters, VS Code URLs. |
 | [Terminal](/providers/terminal) | `@rigkit/provider-freestyle` | Browser terminal sessions for login, SSH, and manual setup. |
 | [cmux](/providers/cmux) | `@rigkit/provider-cmux` | Opening local cmux workspaces from `rig run`. |
+| [Portless](/providers/portless) | `@rigkit/provider-portless` | Stable, named development URLs without app port numbers. |
 | [gcloud](/providers/gcloud) | `@rigkit/provider-gcloud-cli` | Copying local `gcloud` auth/config files into a workspace. |
 
 Need a provider for an internal system? See

@@ -35,6 +35,7 @@
           "providers/freestyle",
           "providers/terminal",
           "providers/cmux",
+          "providers/portless",
           "providers/gcloud"
         ]
       },

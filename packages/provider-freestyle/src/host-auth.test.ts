@@ -10,7 +10,7 @@ import type {
   WorkflowEvent,
 } from "@rigkit/engine";
 import { FREESTYLE_PROVIDER_ID, freestyle, freestyleProviderPlugin } from "./index.ts";
-import { createFreestyleProxyFetch, createFreestyleSdkFetch } from "./host-auth.ts";
+import { createFreestyleSdkFetch } from "./host-auth.ts";
 import type { FreestyleRuntime } from "./provider.ts";
 import { RIGKIT_PROVIDER_FREESTYLE_VERSION } from "./version.ts";
 
@@ -71,10 +71,10 @@ describe("Freestyle provider host auth", () => {
         rigkit: headers.get("x-rigkit"),
         rigkitVersion: headers.get("x-rigkit-version"),
       });
-      if (url.pathname === "/identity/v1/identities" && method === "POST") {
-        return Response.json({ id: "identity-api-key" });
+      if (url.pathname === "/v5/identities" && method === "POST") {
+        return Response.json({ id: "identity-api-key", managed: false });
       }
-      if (url.pathname === "/identity/v1/identities/identity-api-key/tokens" && method === "POST") {
+      if (url.pathname === "/v5/identities/identity-api-key/tokens" && method === "POST") {
         return Response.json({ id: "token-id-api-key", token: "ssh-token-api-key" });
       }
       return Response.json({ error: "unexpected request" }, { status: 500 });
@@ -107,14 +107,14 @@ describe("Freestyle provider host auth", () => {
       });
       expect(requests).toEqual([
         {
-          url: "https://api.freestyle.sh/identity/v1/identities",
+          url: "https://beta-api.freestyle.sh/v5/identities",
           method: "POST",
           authorization: "Bearer object-api-key",
           rigkit: "true",
           rigkitVersion: RIGKIT_PROVIDER_FREESTYLE_VERSION,
         },
         {
-          url: "https://api.freestyle.sh/identity/v1/identities/identity-api-key/tokens",
+          url: "https://beta-api.freestyle.sh/v5/identities/identity-api-key/tokens",
           method: "POST",
           authorization: "Bearer object-api-key",
           rigkit: "true",
@@ -147,14 +147,14 @@ describe("Freestyle provider host auth", () => {
     }
   });
 
-  test("runs browser auth through provider host storage and proxies SDK requests by team", async () => {
+  test("runs browser auth through provider host storage and scopes SDK requests by team", async () => {
     delete process.env.FREESTYLE_API_KEY;
     delete process.env.FREESTYLE_TEAM_ID;
 
     const projectStorage = new MemoryProviderStorage(FREESTYLE_PROVIDER_ID);
     const hostStorage = new MemoryProviderStorage(FREESTYLE_PROVIDER_ID);
     const opened: string[] = [];
-    const proxyRequests: unknown[] = [];
+    const apiRequests: unknown[] = [];
     const previousFetch = globalThis.fetch;
     globalThis.fetch = testFetch(async (resource, init) => {
       const url = resourceUrl(resource);
@@ -167,13 +167,20 @@ describe("Freestyle provider host auth", () => {
       if (url.href === "https://api.stack-auth.com/api/v1/auth/sessions/current/refresh") {
         return Response.json({ access_token: "stack-access-token", refresh_token: "refresh-token-rotated" });
       }
-      if (url.href === "https://dash.freestyle.sh/api/proxy/request") {
-        const body = JSON.parse(String(init?.body));
-        proxyRequests.push(body);
-        if (body.data.path === "identity/v1/identities") {
-          return Response.json({ id: "identity-browser" });
+      if (url.origin === "https://beta-api.freestyle.sh") {
+        const headers = new Headers(init?.headers);
+        apiRequests.push({
+          path: url.pathname,
+          method: init?.method ?? "GET",
+          authorization: headers.get("authorization"),
+          teamId: headers.get("x-freestyle-team-id"),
+          rigkit: headers.get("x-rigkit"),
+          rigkitVersion: headers.get("x-rigkit-version"),
+        });
+        if (url.pathname === "/v5/identities") {
+          return Response.json({ id: "identity-browser", managed: false });
         }
-        if (body.data.path === "identity/v1/identities/identity-browser/tokens") {
+        if (url.pathname === "/v5/identities/identity-browser/tokens") {
           return Response.json({ id: "token-id-browser", token: "ssh-token-browser" });
         }
       }
@@ -216,30 +223,22 @@ describe("Freestyle provider host auth", () => {
         tokenId: "token-id-browser",
         token: "ssh-token-browser",
       });
-      expect(proxyRequests).toEqual([
+      expect(apiRequests).toEqual([
         {
-          data: {
-            accessToken: "stack-access-token",
-            teamId: "team_123",
-            path: "identity/v1/identities",
-            method: "POST",
-            headers: expect.objectContaining({
-              "x-rigkit": "true",
-              "x-rigkit-version": RIGKIT_PROVIDER_FREESTYLE_VERSION,
-            }),
-          },
+          path: "/v5/identities",
+          method: "POST",
+          authorization: "Bearer stack-access-token",
+          teamId: "team_123",
+          rigkit: "true",
+          rigkitVersion: RIGKIT_PROVIDER_FREESTYLE_VERSION,
         },
         {
-          data: {
-            accessToken: "stack-access-token",
-            teamId: "team_123",
-            path: "identity/v1/identities/identity-browser/tokens",
-            method: "POST",
-            headers: expect.objectContaining({
-              "x-rigkit": "true",
-              "x-rigkit-version": RIGKIT_PROVIDER_FREESTYLE_VERSION,
-            }),
-          },
+          path: "/v5/identities/identity-browser/tokens",
+          method: "POST",
+          authorization: "Bearer stack-access-token",
+          teamId: "team_123",
+          rigkit: "true",
+          rigkitVersion: RIGKIT_PROVIDER_FREESTYLE_VERSION,
         },
       ]);
 
@@ -266,7 +265,7 @@ describe("Freestyle provider host auth", () => {
         fingerprint: "identity:identity-browser",
       });
       expect(planChecks[0]?.fingerprint).toBe(requireChecks[0]?.fingerprint);
-      expect(proxyRequests).toHaveLength(2);
+      expect(apiRequests).toHaveLength(2);
     } finally {
       globalThis.fetch = previousFetch;
     }
@@ -315,7 +314,7 @@ describe("Freestyle provider host auth", () => {
     const projectStorage = new MemoryProviderStorage(FREESTYLE_PROVIDER_ID);
     const hostStorage = new MemoryProviderStorage(FREESTYLE_PROVIDER_ID);
     const selectPrompts: unknown[] = [];
-    const proxyRequests: unknown[] = [];
+    const apiRequests: unknown[] = [];
     const previousFetch = globalThis.fetch;
     globalThis.fetch = testFetch(async (resource, init) => {
       const url = resourceUrl(resource);
@@ -329,18 +328,26 @@ describe("Freestyle provider host auth", () => {
         return Response.json({ access_token: "stack-access-token", refresh_token: "refresh-token" });
       }
       if (url.href === "https://dash.freestyle.sh/api/cli/teams") {
-        return Response.json([
-          { id: "team_alpha", displayName: "Alpha" },
-          { id: "team_beta", displayName: "Beta", sandboxAccountId: "sandbox-beta" },
-        ]);
+        expect(new Headers(init?.headers).get("authorization")).toBe("Bearer stack-access-token");
+        return Response.json({
+          user: { id: "user_1", email: null, displayName: null },
+          defaultTeamId: null,
+          teams: [
+            { teamId: "team_alpha", name: "Alpha", role: "admin" },
+            { teamId: "team_beta", name: "Beta", role: "admin", accountId: "sandbox-beta" },
+          ],
+        });
       }
-      if (url.href === "https://dash.freestyle.sh/api/proxy/request") {
-        const body = JSON.parse(String(init?.body));
-        proxyRequests.push(body);
-        if (body.data.path === "identity/v1/identities") {
-          return Response.json({ id: "identity-browser" });
+      if (url.origin === "https://beta-api.freestyle.sh") {
+        const headers = new Headers(init?.headers);
+        apiRequests.push({
+          path: url.pathname,
+          teamId: headers.get("x-freestyle-team-id"),
+        });
+        if (url.pathname === "/v5/identities") {
+          return Response.json({ id: "identity-browser", managed: false });
         }
-        if (body.data.path === "identity/v1/identities/identity-browser/tokens") {
+        if (url.pathname === "/v5/identities/identity-browser/tokens") {
           return Response.json({ id: "token-id-browser", token: "ssh-token-browser" });
         }
       }
@@ -383,19 +390,15 @@ describe("Freestyle provider host auth", () => {
         defaultTeamId: "team_beta",
         defaultTeamName: "Beta",
       });
-      expect(proxyRequests).toEqual([
-        expect.objectContaining({
-          data: expect.objectContaining({
-            teamId: "team_beta",
-            path: "identity/v1/identities",
-          }),
-        }),
-        expect.objectContaining({
-          data: expect.objectContaining({
-            teamId: "team_beta",
-            path: "identity/v1/identities/identity-browser/tokens",
-          }),
-        }),
+      expect(apiRequests).toEqual([
+        {
+          path: "/v5/identities",
+          teamId: "team_beta",
+        },
+        {
+          path: "/v5/identities/identity-browser/tokens",
+          teamId: "team_beta",
+        },
       ]);
       expect(checks).toContainEqual(expect.objectContaining({
         id: "team",
@@ -408,6 +411,95 @@ describe("Freestyle provider host auth", () => {
           teamName: "Beta",
         },
       }));
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  });
+
+  test("discards a stored team the account can no longer access", async () => {
+    delete process.env.FREESTYLE_API_KEY;
+    delete process.env.FREESTYLE_TEAM_ID;
+
+    const projectStorage = new MemoryProviderStorage(FREESTYLE_PROVIDER_ID);
+    const hostStorage = new MemoryProviderStorage(FREESTYLE_PROVIDER_ID);
+    let teams = [
+      { teamId: "team_alpha", name: "Alpha", role: "admin" },
+      { teamId: "team_beta", name: "Beta", role: "admin" },
+    ];
+    const identityTeamIds: Array<string | null> = [];
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = testFetch(async (resource, init) => {
+      const url = resourceUrl(resource);
+      if (url.href === "https://api.stack-auth.com/api/v1/auth/cli") {
+        return Response.json({ polling_code: "poll-code", login_code: "login-code" });
+      }
+      if (url.href === "https://api.stack-auth.com/api/v1/auth/cli/poll") {
+        return Response.json({ status: "completed", refresh_token: "refresh-token" });
+      }
+      if (url.href === "https://api.stack-auth.com/api/v1/auth/sessions/current/refresh") {
+        return Response.json({ access_token: "stack-access-token", refresh_token: "refresh-token" });
+      }
+      if (url.href === "https://dash.freestyle.sh/api/cli/teams") {
+        return Response.json({
+          user: { id: "user_1", email: null, displayName: null },
+          defaultTeamId: null,
+          teams,
+        });
+      }
+      if (url.origin === "https://beta-api.freestyle.sh") {
+        if (url.pathname === "/v5/identities") {
+          identityTeamIds.push(new Headers(init?.headers).get("x-freestyle-team-id"));
+          return Response.json({ id: `identity-${identityTeamIds.length}`, managed: false });
+        }
+        if (/^\/v5\/identities\/identity-\d+\/tokens$/.test(url.pathname)) {
+          return Response.json({ id: "token-id", token: "ssh-token" });
+        }
+      }
+      return Response.json({ error: "unexpected request", url: url.href }, { status: 500 });
+    });
+
+    try {
+      const local = {
+        open: async () => {},
+        prompt: {
+          message: async () => {},
+          text: async () => "",
+          confirm: async () => true,
+          select: async () => "team_beta",
+        },
+      };
+      const provider = {
+        providerId: FREESTYLE_PROVIDER_ID,
+        config: {},
+      };
+
+      const controller = await freestyleProviderPlugin.createProvider({
+        provider,
+        storage: projectStorage,
+        hostStorage,
+        local,
+      });
+      await controller.runtime(providerContext([], local));
+      expect(identityTeamIds).toEqual(["team_beta"]);
+      expect(hostStorage.entries("stack-auth:")[0]?.value).toMatchObject({
+        defaultTeamId: "team_beta",
+      });
+
+      // The account moves platforms: team_beta is gone, only team_gamma remains.
+      teams = [{ teamId: "team_gamma", name: "Gamma", role: "admin" }];
+      const nextController = await freestyleProviderPlugin.createProvider({
+        provider,
+        storage: projectStorage,
+        hostStorage,
+        local,
+      });
+      await nextController.runtime(providerContext([], local));
+
+      expect(identityTeamIds).toEqual(["team_beta", "team_gamma"]);
+      expect(hostStorage.entries("stack-auth:")[0]?.value).toMatchObject({
+        defaultTeamId: "team_gamma",
+        defaultTeamName: "Gamma",
+      });
     } finally {
       globalThis.fetch = previousFetch;
     }
@@ -437,20 +529,20 @@ describe("Freestyle provider host auth", () => {
       if (url.href === "https://api.stack-auth.com/api/v1/auth/sessions/current/refresh") {
         return Response.json({ access_token: "stack-access-token", refresh_token: "refresh-token" });
       }
-      if (url.href === "https://dash.freestyle.sh/api/proxy/request") {
-        const body = JSON.parse(String(init?.body));
-        if (body.data.path === "api/cli/teams") {
-          return Response.json([{ id: "team_123", displayName: "Team" }]);
+      if (url.href === "https://dash.freestyle.sh/api/cli/teams") {
+        return Response.json({
+          user: { id: "user_1", email: null, displayName: null },
+          defaultTeamId: null,
+          teams: [{ teamId: "team_123", name: "Team", role: "admin" }],
+        });
+      }
+      if (url.origin === "https://beta-api.freestyle.sh") {
+        if (url.pathname === "/v5/identities") {
+          return Response.json({ id: "identity-browser", managed: false });
         }
-        if (body.data.path === "identity/v1/identities") {
-          return Response.json({ id: "identity-browser" });
-        }
-        if (body.data.path === "identity/v1/identities/identity-browser/tokens") {
+        if (url.pathname === "/v5/identities/identity-browser/tokens") {
           return Response.json({ id: "token-id-browser", token: "ssh-token-browser" });
         }
-      }
-      if (url.href === "https://dash.freestyle.sh/api/cli/teams") {
-        return Response.json([{ id: "team_123", displayName: "Team" }]);
       }
       return Response.json({ error: "unexpected request", url: url.href }, { status: 500 });
     });
@@ -484,7 +576,7 @@ describe("Freestyle provider host auth", () => {
   });
 });
 
-describe("Freestyle provider proxy fetch", () => {
+describe("Freestyle SDK fetch", () => {
   test("logs a replayable API-key fetch with the Freestyle API key redacted", async () => {
     const sdkFetch = createFreestyleSdkFetch(testFetch(async () =>
       Response.json({
@@ -498,14 +590,14 @@ describe("Freestyle provider proxy fetch", () => {
     ));
 
     const messages = await captureConsoleError(async () => {
-      const response = await sdkFetch("https://api.freestyle.sh/v1/vms", {
+      const response = await sdkFetch("https://beta-api.freestyle.sh/v5/vms", {
         method: "POST",
         headers: {
           Authorization: "Bearer real-api-key",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          image: "ubuntu-24.04",
+          snapshotId: "freestyle/ubuntu",
           apiKey: "body-api-key",
         }),
       });
@@ -514,9 +606,9 @@ describe("Freestyle provider proxy fetch", () => {
     });
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain('await fetch("https://api.freestyle.sh/v1/vms", {');
+    expect(messages[0]).toContain('await fetch("https://beta-api.freestyle.sh/v5/vms", {');
     expect(messages[0]).toContain('"Authorization": "Bearer <redacted FREESTYLE_API_KEY>"');
-    expect(messages[0]).toContain('"image": "ubuntu-24.04"');
+    expect(messages[0]).toContain('"snapshotId": "freestyle/ubuntu"');
     expect(messages[0]).toContain('"apiKey": "[redacted]"');
     expect(messages[0]).toContain('Response: 500 Internal Server Error');
     expect(messages[0]).toContain("TraceId: trace_sdk_123");
@@ -524,49 +616,45 @@ describe("Freestyle provider proxy fetch", () => {
     expect(messages[0]).not.toContain("body-api-key");
   });
 
-  test("logs the original replayable request when a background request fails through the proxy", async () => {
-    const proxyFetch = createFreestyleProxyFetch({
-      dashboardUrl: "https://dash.freestyle.sh",
-      accessToken: "stack-access-token",
-      teamId: "team_123",
-      fetch: testFetch(async (resource, init) => {
-        const url = resourceUrl(resource);
-        expect(url.href).toBe("https://dash.freestyle.sh/api/proxy/request");
-        const body = JSON.parse(String(init?.body));
-        if (body.data.path === "v1/vms") {
-          return Response.json({
-            requestId: "ri_test_123",
-            status: "pending",
-          });
-        }
-        if (body.data.path === "auth/v1/background-requests/ri_test_123") {
-          return Response.json({
-            code: "INTERNAL_ERROR",
-            message: "Internal server error",
-            accessToken: "should-redact",
-          }, { status: 500, statusText: "Internal Server Error" });
-        }
-        return Response.json({ error: "unexpected request", body }, { status: 500 });
-      }),
-    });
+  test("logs the original replayable request when a background request poll fails", async () => {
+    const sdkFetch = createFreestyleSdkFetch(testFetch(async (resource) => {
+      const url = resourceUrl(resource);
+      if (url.pathname === "/v5/vms") {
+        return Response.json({
+          requestId: "ri_test_123",
+          resultUrl: "/v5/background-requests/ri_test_123",
+        }, {
+          status: 202,
+          headers: { "x-freestyle-background-request-id": "ri_test_123" },
+        });
+      }
+      if (url.pathname === "/v5/background-requests/ri_test_123") {
+        return Response.json({
+          code: "INTERNAL_ERROR",
+          message: "Internal server error",
+          accessToken: "should-redact",
+        }, { status: 500, statusText: "Internal Server Error" });
+      }
+      return Response.json({ error: "unexpected request" }, { status: 500 });
+    }));
 
-    const first = await proxyFetch("https://api.freestyle.sh/v1/vms", {
+    const first = await sdkFetch("https://beta-api.freestyle.sh/v5/vms", {
       method: "POST",
       headers: {
-        Authorization: "Bearer rigkit-browser-auth",
+        Authorization: "Bearer real-api-key",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        image: "ubuntu-24.04",
+        snapshotId: "freestyle/ubuntu",
       }),
     });
     expect(first.status).toBe(202);
 
     const messages = await captureConsoleError(async () => {
-      const failed = await proxyFetch("https://api.freestyle.sh/auth/v1/background-requests/ri_test_123", {
+      const failed = await sdkFetch("https://beta-api.freestyle.sh/v5/background-requests/ri_test_123", {
         method: "GET",
         headers: {
-          Authorization: "Bearer rigkit-browser-auth",
+          Authorization: "Bearer real-api-key",
         },
       });
       expect(failed.status).toBe(500);
@@ -575,130 +663,13 @@ describe("Freestyle provider proxy fetch", () => {
 
     expect(messages).toHaveLength(1);
     expect(messages[0]).toContain("Freestyle background request ri_test_123 failed. Original API request:");
-    expect(messages[0]).toContain('await fetch("https://api.freestyle.sh/v1/vms", {');
+    expect(messages[0]).toContain('await fetch("https://beta-api.freestyle.sh/v5/vms", {');
     expect(messages[0]).toContain('method: "POST"');
     expect(messages[0]).toContain('"Authorization": "Bearer <redacted FREESTYLE_API_KEY>"');
-    expect(messages[0]).toContain('"image": "ubuntu-24.04"');
+    expect(messages[0]).toContain('"snapshotId": "freestyle/ubuntu"');
     expect(messages[0]).toContain('Response: 500 Internal Server Error');
-    expect(messages[0]).toContain('"accessToken":"[redacted]"');
-    expect(messages[0]).not.toContain("stack-access-token");
-    expect(messages[0]).not.toContain("rigkit-browser-auth");
+    expect(messages[0]).not.toContain("real-api-key");
     expect(messages[0]).not.toContain("should-redact");
-  });
-
-  test("preserves Freestyle background request semantics through the browser-auth proxy", async () => {
-    const proxyFetch = createFreestyleProxyFetch({
-      dashboardUrl: "https://dash.freestyle.sh",
-      accessToken: "stack-access-token",
-      teamId: "team_123",
-      fetch: testFetch(async (resource, init) => {
-        const url = resourceUrl(resource);
-        expect(url.href).toBe("https://dash.freestyle.sh/api/proxy/request");
-        expect(init?.method).toBe("POST");
-        expect(new Headers(init?.headers).get("x-rigkit")).toBe("true");
-        expect(new Headers(init?.headers).get("x-rigkit-version")).toBe(RIGKIT_PROVIDER_FREESTYLE_VERSION);
-
-        const body = JSON.parse(String(init?.body));
-        expect(body).toMatchObject({
-          data: {
-            accessToken: "stack-access-token",
-            teamId: "team_123",
-            path: "v1/vms",
-            method: "POST",
-            headers: {
-              "x-rigkit": "true",
-              "x-rigkit-version": RIGKIT_PROVIDER_FREESTYLE_VERSION,
-            },
-          },
-        });
-
-        return Response.json({
-          requestId: "ri_test_123",
-          status: "pending",
-          resultUrl: "/auth/v1/background-requests/ri_test_123",
-          logsUrl: "/observability/v1/logs?requestId=ri_test_123",
-        });
-      }),
-    });
-
-    const response = await proxyFetch("https://api.freestyle.sh/v1/vms", {
-      method: "POST",
-      body: "{}",
-    });
-
-    expect(response.status).toBe(202);
-    expect(response.headers.get("x-freestyle-background-request-id")).toBe("ri_test_123");
-    await expect(response.json()).resolves.toMatchObject({
-      requestId: "ri_test_123",
-      status: "pending",
-    });
-  });
-
-  test("preserves proxy error details for run logs", async () => {
-    const proxyFetch = createFreestyleProxyFetch({
-      dashboardUrl: "https://dash.freestyle.sh",
-      accessToken: "stack-access-token",
-      teamId: "team_123",
-      fetch: testFetch(async () =>
-        Response.json({
-          error: "VM setup failed",
-          requestId: "req_123",
-          logs: ["failed to boot base image"],
-          accessToken: "secret-token",
-        }, { status: 500, headers: { "x-freestyle-trace-id": "trace_proxy_123" } })
-      ),
-    });
-
-    let response: Response | undefined;
-    const messages = await captureConsoleError(async () => {
-      response = await proxyFetch("https://api.freestyle.sh/v1/vms", {
-        method: "POST",
-        body: "{}",
-      });
-    });
-
-    expect(response?.status).toBe(500);
-    expect(response?.headers.get("x-freestyle-trace-id")).toBe("trace_proxy_123");
-    expect(messages[0]).toContain("TraceId: trace_proxy_123");
-    await expect(response?.json()).resolves.toEqual({
-      code: "INTERNAL_ERROR",
-      message: "VM setup failed",
-      details: {
-        error: "VM setup failed",
-        requestId: "req_123",
-        logs: ["failed to boot base image"],
-        accessToken: "[redacted]",
-      },
-    });
-  });
-
-  test("redacts sensitive fields on coded proxy errors", async () => {
-    const proxyFetch = createFreestyleProxyFetch({
-      dashboardUrl: "https://dash.freestyle.sh",
-      accessToken: "stack-access-token",
-      teamId: "team_123",
-      fetch: testFetch(async () =>
-        Response.json({
-          code: "INTERNAL_ERROR",
-          message: "Internal server error",
-          requestId: "req_123",
-          accessToken: "secret-token",
-        }, { status: 500 })
-      ),
-    });
-
-    let response: Response | undefined;
-    await captureConsoleError(async () => {
-      response = await proxyFetch("https://api.freestyle.sh/v1/vms");
-    });
-
-    expect(response?.status).toBe(500);
-    await expect(response?.json()).resolves.toEqual({
-      code: "INTERNAL_ERROR",
-      message: "Internal server error",
-      requestId: "req_123",
-      accessToken: "[redacted]",
-    });
   });
 });
 

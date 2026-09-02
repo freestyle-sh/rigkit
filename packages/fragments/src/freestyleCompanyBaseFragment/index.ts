@@ -1,7 +1,11 @@
 import {
+  execLongCommand,
   freestyle,
+  type FirewallSpec,
   type FreestyleProviderDefinition,
+  type FreestyleSdkVm,
   type FreestyleTerminalProviderDefinition,
+  type VmResources,
 } from "@rigkit/provider-freestyle";
 import {
   sequence,
@@ -161,21 +165,24 @@ export function freestyleCompanyBaseFragment(options: FreestyleCompanyBaseFragme
       "install-tooling",
       { version: "freestyle-company-base-tooling-v2" },
       async ({ config, providers, step }) => {
-        const { vm, vmId } = await providers.freestyle.client.vms.create({
+        const { vm, vmId, data } = await providers.freestyle.client.vms.create({
+          firewall: publicInternetFirewall(),
           idleTimeoutSeconds: config.vm.idleTimeoutSeconds,
-          memSizeGb: config.vm.memSizeGb,
-          vcpuCount: config.vm.vcpuCount,
-          rootfsSizeGb: config.vm.rootfsSizeGb,
-          logger: console.log,
         });
         try {
-          const tooling = await vm.exec({
+          await growVmResources(vm, data.resources, {
+            cpu: config.vm.vcpuCount,
+            memory: config.vm.memSizeGb * 1024,
+            storage: config.vm.rootfsSizeGb * 1024,
+          });
+          const tooling = await execLongCommand(vm, {
             command: installToolingCommand(config),
             timeoutMs: 20 * 60 * 1000,
+            onOutput: (chunk) => console.log(chunk.trimEnd()),
           });
-          if ((tooling.statusCode ?? 0) !== 0) {
+          if (tooling.timedOut || (tooling.statusCode ?? 0) !== 0) {
             throw new Error(
-              `Freestyle company base tooling install failed:\n${tooling.stdout ?? ""}${tooling.stderr ?? ""}`.trim(),
+              `Freestyle company base tooling install ${tooling.timedOut ? "timed out" : "failed"}:\n${tooling.stdout}`.trim(),
             );
           }
 
@@ -205,7 +212,7 @@ export function freestyleCompanyBaseFragment(options: FreestyleCompanyBaseFragme
             },
           };
         } finally {
-          await providers.freestyle.client.vms.delete({ vmId });
+          await providers.freestyle.client.vms.delete(vmId);
         }
       },
     )
@@ -217,8 +224,8 @@ export function freestyleCompanyBaseFragment(options: FreestyleCompanyBaseFragme
 
         const created = await providers.freestyle.client.vms.create({
           snapshotId: step.ctx.snapshotId,
+          firewall: publicInternetFirewall(),
           idleTimeoutSeconds: config.vm.idleTimeoutSeconds,
-          logger: console.log,
         });
         const { vm, vmId } = created;
         try {
@@ -254,7 +261,7 @@ export function freestyleCompanyBaseFragment(options: FreestyleCompanyBaseFragme
           const snapshot = await vm.snapshot();
           return { ctx: updateCompanyBaseSnapshot(step.ctx, snapshot.snapshotId, { github: true }) };
         } finally {
-          await providers.freestyle.client.vms.delete({ vmId });
+          await providers.freestyle.client.vms.delete(vmId);
         }
       },
     )
@@ -266,8 +273,8 @@ export function freestyleCompanyBaseFragment(options: FreestyleCompanyBaseFragme
 
         const { vm, vmId } = await providers.freestyle.client.vms.create({
           snapshotId: step.ctx.snapshotId,
+          firewall: publicInternetFirewall(),
           idleTimeoutSeconds: config.vm.idleTimeoutSeconds,
-          logger: console.log,
         });
         try {
           await providers.terminal.open("Initialize Codex CLI", {
@@ -281,7 +288,7 @@ export function freestyleCompanyBaseFragment(options: FreestyleCompanyBaseFragme
           const snapshot = await vm.snapshot();
           return { ctx: updateCompanyBaseSnapshot(step.ctx, snapshot.snapshotId, { codex: true }) };
         } finally {
-          await providers.freestyle.client.vms.delete({ vmId });
+          await providers.freestyle.client.vms.delete(vmId);
         }
       },
     )
@@ -293,8 +300,8 @@ export function freestyleCompanyBaseFragment(options: FreestyleCompanyBaseFragme
 
         const { vm, vmId } = await providers.freestyle.client.vms.create({
           snapshotId: step.ctx.snapshotId,
+          firewall: publicInternetFirewall(),
           idleTimeoutSeconds: config.vm.idleTimeoutSeconds,
-          logger: console.log,
         });
         try {
           await providers.terminal.open("Initialize Claude CLI", {
@@ -308,7 +315,7 @@ export function freestyleCompanyBaseFragment(options: FreestyleCompanyBaseFragme
           const snapshot = await vm.snapshot();
           return { ctx: updateCompanyBaseSnapshot(step.ctx, snapshot.snapshotId, { claude: true }) };
         } finally {
-          await providers.freestyle.client.vms.delete({ vmId });
+          await providers.freestyle.client.vms.delete(vmId);
         }
       },
     ) as unknown as FreestyleCompanyBaseFragment;
@@ -334,8 +341,8 @@ function freestyleCompanyBaseAuthCheckFragment<Context extends FreestyleCompanyB
   const handler = async ({ providers, step }: any) => {
     const { vm, vmId } = await providers.freestyle.client.vms.create({
       snapshotId: step.ctx.snapshotId,
+      firewall: publicInternetFirewall(),
       idleTimeoutSeconds: step.ctx.freestyleCompanyBase.idleTimeoutSeconds,
-      logger: console.log,
     });
     try {
       if (options.github ?? true) {
@@ -347,7 +354,7 @@ function freestyleCompanyBaseAuthCheckFragment<Context extends FreestyleCompanyB
 
       return { ctx: { ...step.ctx } as Context };
     } finally {
-      await providers.freestyle.client.vms.delete({ vmId });
+      await providers.freestyle.client.vms.delete(vmId);
     }
   };
 
@@ -392,6 +399,19 @@ function installToolingCommand(config: FreestyleCompanyBaseFragmentConfig): stri
     "corepack enable || true",
     "npm config set prefix /usr/local",
   );
+
+  // The Freestyle base image preinstalls agent CLIs as symlinks into its own
+  // node; remove the ones being reinstalled so npm can link without EEXIST.
+  const preinstalledBins: Record<string, string> = {
+    [codexPackage]: "codex",
+    [claudePackage]: "claude",
+  };
+  const staleBins = config.npmPackages
+    .map((npmPackage) => preinstalledBins[npmPackage])
+    .filter((bin): bin is string => Boolean(bin));
+  if (staleBins.length) {
+    lines.push(`rm -f ${staleBins.map((bin) => shellQuote(`/usr/local/bin/${bin}`)).join(" ")}`);
+  }
 
   const backgroundInstalls: string[] = [];
   if (config.bun) {
@@ -481,6 +501,36 @@ function updateCompanyBaseSnapshot(
       },
     },
   };
+}
+
+// Freestyle v2 VMs reach nothing they have not been allowed to; tooling
+// installs and browser-auth flows need the public internet.
+function publicInternetFirewall(): FirewallSpec {
+  return {
+    rules: [{ action: "allow", source: {}, destination: { public: true } }],
+  };
+}
+
+// Freestyle v2 sizes VMs from their snapshot; resize is grow-only, so only
+// dimensions above the current shape are requested.
+async function growVmResources(
+  vm: FreestyleSdkVm,
+  current: VmResources,
+  requested: VmResources,
+): Promise<void> {
+  const target = {
+    cpu: Math.max(current.cpu, requested.cpu),
+    memory: Math.max(current.memory, requested.memory),
+    storage: Math.max(current.storage, requested.storage),
+  };
+  if (
+    target.cpu === current.cpu &&
+    target.memory === current.memory &&
+    target.storage === current.storage
+  ) {
+    return;
+  }
+  await vm.resize(target);
 }
 
 function shellQuote(value: string): string {
