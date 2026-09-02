@@ -8,6 +8,12 @@ import { RIGKIT_CLI_VERSION } from "./version.ts";
 
 const cliPath = join(import.meta.dir, "cli.ts");
 
+// Derive mismatch fixtures from the real CLI version so release bumps do not
+// accidentally turn a "different minor/major" fixture into a matching version.
+const [cliMajor, cliMinor] = RIGKIT_CLI_VERSION.split(".").map(Number);
+const nextMinorVersion = `${cliMajor}.${cliMinor + 1}.0`;
+const nextMajorVersion = `${cliMajor + 1}.0.0`;
+
 function rigkitIndexPath(projectDir: string): string {
   return join(projectDir, "rigkit", "index.ts");
 }
@@ -415,8 +421,8 @@ describe("CLI entrypoint", () => {
 
     await withWorkspaceRuntime({
       projectDir,
-      runtimeVersion: "0.3.0",
-      engineVersion: "0.3.0",
+      runtimeVersion: nextMinorVersion,
+      engineVersion: nextMinorVersion,
     }, async ({ env }) => {
       const result = await runCli([`--chdir=${projectDir}`, "ls"], { env });
 
@@ -433,8 +439,8 @@ describe("CLI entrypoint", () => {
 
     await withWorkspaceRuntime({
       projectDir,
-      runtimeVersion: "0.3.0",
-      engineVersion: "0.3.0",
+      runtimeVersion: nextMinorVersion,
+      engineVersion: nextMinorVersion,
     }, async ({ env }) => {
       const result = await runCli([`--chdir=${projectDir}`, "ls", "--json"], { env });
 
@@ -449,8 +455,8 @@ describe("CLI entrypoint", () => {
 
     await withWorkspaceRuntime({
       projectDir,
-      runtimeVersion: "1.0.0",
-      engineVersion: "1.0.0",
+      runtimeVersion: nextMajorVersion,
+      engineVersion: nextMajorVersion,
     }, async ({ env }) => {
       const result = await runCli([`--chdir=${projectDir}`, "ls"], { env });
 
