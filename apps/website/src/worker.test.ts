@@ -253,6 +253,25 @@ describe("website worker · install routes", () => {
   });
 
   test("serves the public docs versions manifest from the website Worker", async () => {
+    setDocsVersions([
+      {
+        version: "v0.2.17",
+        label: "v0.2.17 · Latest",
+        basePath: "/docs",
+        startPath: "/docs",
+        binding: "DOCS_LATEST",
+        current: true,
+      },
+      {
+        version: "v0.1",
+        label: "v0.1 · v0.1.9",
+        basePath: "/docs/v0.1",
+        startPath: "/docs/v0.1",
+        binding: "DOCS_V0_1",
+        archive: true,
+      },
+    ]);
+
     const response = await worker.fetch(
       new Request("https://www.rigkit.dev/docs/api/versions.json"),
       {
@@ -274,8 +293,18 @@ describe("website worker · install routes", () => {
         current: true,
         archive: false,
       },
+      {
+        version: "v0.1",
+        label: "v0.1 · v0.1.9",
+        basePath: "/docs/v0.1",
+        startPath: "/docs/v0.1",
+        current: false,
+        archive: true,
+      },
     ]);
-    expect(body.entries[0]).not.toHaveProperty("binding");
+    for (const entry of body.entries) {
+      expect(entry).not.toHaveProperty("binding");
+    }
   });
 
   test("serves the docs version selector script from the website Worker", async () => {
