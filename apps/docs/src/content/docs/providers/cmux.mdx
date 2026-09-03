@@ -4,9 +4,9 @@ description: "Open local cmux workspaces from Rigkit workspace operations."
 figure: "providers"
 ---
 
-The cmux provider asks the local Rigkit host to open a cmux workspace connected
-to a remote environment. It is normally used as a workspace operation after a
-Freestyle VM has been created.
+The cmux provider asks the local Rigkit host to drive cmux, so an operation can
+open a workspace connected to a remote environment. It is normally used as a
+workspace operation after a Freestyle VM has been created.
 
 ## Add the provider
 
@@ -27,39 +27,92 @@ export const website = app
 ```
 
 Add `cmux.provider()` before the workspace operation that opens cmux. The Rigkit
-CLI registers the trusted `cmux.open` host capability automatically.
+CLI registers the trusted `cmux.call` host capability automatically, and every
+runtime method below goes through it.
 
 ## Open a workspace
+
+The runtime mirrors cmux's socket commands. Connect with `ssh`, add surfaces,
+send keystrokes into terminals, then focus the workspace:
 
 ```ts
 .workspaceOperation("open-cmux", {
   title: "Open cmux",
   description: "Open the workspace in cmux",
   run: async ({ providers, workspace }) => {
-    await providers.cmux.open({
-      name: workspace.name,
-      ssh: await providers.freestyle.cmux.createSshOptions({
+    const cmuxWorkspace = await providers.cmux.ssh({
+      ...(await providers.freestyle.cmux.createSshOptions({
         vmId: workspace.ctx.vmId,
-      }),
-      cwd: workspace.ctx.repoPath,
-      surfaceLayout: "tabs",
-      terminals: [
-        { command: workspace.ctx.devCommand },
-        { command: "codex", focus: false },
-      ],
+      })),
+      name: workspace.name,
+    });
+
+    await providers.cmux.newSurface({
+      workspace: cmuxWorkspace.workspaceId,
+      type: "browser",
       url: `http://localhost:${workspace.ctx.devPort}`,
       focus: true,
-      waitForRemoteReady: {
-        timeoutMs: 90 * 1000,
-        requireProxy: true,
-      },
     });
+
+    const devTerminal = await providers.cmux.newSurface({
+      workspace: cmuxWorkspace.workspaceId,
+      type: "terminal",
+      focus: false,
+    });
+    await providers.cmux.send({
+      workspace: cmuxWorkspace.workspaceId,
+      surface: devTerminal.surfaceId,
+      text: `cd ${workspace.ctx.repoPath} && ${workspace.ctx.devCommand}\n`,
+    });
+
+    const agentTerminal = await providers.cmux.newSurface({
+      workspace: cmuxWorkspace.workspaceId,
+      type: "terminal",
+      focus: false,
+    });
+    await providers.cmux.send({
+      workspace: cmuxWorkspace.workspaceId,
+      surface: agentTerminal.surfaceId,
+      text: `cd ${workspace.ctx.repoPath} && codex\n`,
+    });
+
+    await providers.cmux.selectWorkspace(cmuxWorkspace.workspaceId);
   },
 });
 ```
 
-Use `surfaceLayout: "tabs"` to put terminals and the optional browser URL in
-tabs in the same cmux pane. Omit it, or set `"splits"`, for split panes.
+Terminals in an SSH workspace start as remote shells on the VM, so `send`
+writes keystrokes there. End each command with `\n` so the shell runs it. A
+browser surface's URL is proxied through the remote VM, which is how
+`localhost` resolves to the dev server running inside it.
+
+## Runtime methods
+
+| Method | Description |
+| --- | --- |
+| `ssh(options)` | Create a workspace connected over SSH. Spread `providers.freestyle.cmux.createSshOptions(...)` in and add `name`. Returns `{ workspaceId, sessionId }`. |
+| `newWorkspace(options?)` | Create a local workspace with optional `name`, `cwd`, `command`, and `focus`. |
+| `newSurface(options?)` | Add a `terminal` or `browser` surface to a workspace or pane. Returns `{ surfaceId, paneId }`. |
+| `newPane(options?)` | Split a new pane in a `direction` and give it a surface. |
+| `browserOpen(options?)` | Open a URL in a browser surface. |
+| `send(options)` | Send `text` to a terminal surface. |
+| `selectWorkspace(workspaceId)` | Focus a workspace. |
+| `waitForRemoteReady(options)` | Wait until the SSH workspace's remote daemon and proxy are ready. Defaults to a 90 second timeout with `requireProxy: true`. |
+| `portsKick(options)` | Ask cmux to rescan forwarded ports. |
+| `call({ method, params })` | Invoke any of the above by name. |
+
+`ssh` returns once cmux has configured the connection and focuses the new
+workspace unless you pass `noFocus: true`. It does not wait for the remote
+shell or proxy. Call `waitForRemoteReady` first when a browser surface or a
+`send` must not run until the VM side is up:
+
+```ts
+await providers.cmux.waitForRemoteReady({
+  workspace: cmuxWorkspace.workspaceId,
+  timeoutMs: 90 * 1000,
+  requireProxy: true,
+});
+```
 
 ## Socket control
 

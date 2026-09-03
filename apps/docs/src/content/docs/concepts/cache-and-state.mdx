@@ -1,7 +1,6 @@
 ---
 title: "Cache and state"
 description: "Where Rigkit stores task outputs, workspace records, fragments, and provider state — and how to invalidate them."
-noindex: true
 figure: "concepts"
 ---
 
@@ -61,16 +60,19 @@ handles, or accidental secrets.
 ## Cache keys
 
 A cached task run is reusable only when it still matches the current graph.
-Rigkit considers:
+Rigkit looks up runs by:
 
 - the task path and name;
 - the task handler fingerprint;
 - the merged `.configure(...)` stack;
 - the output schema;
 - upstream cached run ids;
-- the scoped provider fingerprint for providers added before the task;
-- the task `cacheTTL`;
-- provider artifact validation, when a provider implements it.
+- the scoped provider fingerprint for providers added before the task.
+
+A matching run is then rejected if its `cacheTTL` has expired, or if a provider
+implementing `validateArtifact(...)` reports one of its artifact refs as gone.
+Changing only a task's `cacheTTL` does not invalidate a run that is still
+fresh.
 
 Provider fingerprints include provider ids, resolved provider config, and
 provider plugin identity. Changing provider config makes cached runs unusable
@@ -191,7 +193,8 @@ But the `gcloud` cli expires after a day, so every day you might need to reauthe
           "Complete Google authentication in the browser, then exit the terminal or click Complete task.",
       });
 
-      await vm.exec(provisionGCloudResources);
+      // Provision the resources you need here.
+      await vm.exec("gcloud projects list");
 
       const snapshot = await vm.snapshot();
       return {
@@ -223,8 +226,8 @@ Then check credentials daily and reauthenticate if needed:
 
     try {
       // Check if current credentials are valid
-      const authStatus = await vm.exec("gcloud auth application-default print-access-token");
-      if (!authStatus.ok) {
+      const authStatus = await vm.exec("gcloud auth print-access-token");
+      if ((authStatus.statusCode ?? 0) !== 0) {
         // Credentials expired, reauthenticate
         await providers.terminal.open("Refresh gcloud authentication", {
           ssh: await providers.freestyle.createSSHOptions({ vmId }),
@@ -331,8 +334,8 @@ repo or dependencies are stale:
       await vm.exec("git fetch");
 
       // Check if package-lock.json has changed
-      const depsStatus = await vm.exec("git diff --quiet origin/HEAD package-lock.json");
-      if (!depsStatus.ok) {
+      const depsStatus = await vm.exec("git diff --quiet origin/HEAD -- package-lock.json");
+      if ((depsStatus.statusCode ?? 0) !== 0) {
         return step.invalidate("clone-and-install");
       }
 
@@ -436,7 +439,7 @@ const branch = storage.get("branch:br_123");
 Freestyle browser login, for example, uses provider-owned host storage. That
 is why deleting `.rigkit/state.sqlite` does not log the user out of Freestyle.
 
-See [Creating providers](/v0.2.10/providers/creating-providers) for the full storage
+See [Creating providers](/providers/creating-providers) for the full storage
 API and patterns.
 
 ## Storage rules of thumb

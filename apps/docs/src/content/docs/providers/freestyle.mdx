@@ -67,7 +67,9 @@ const setup = app
     await vm.resize({ cpu: 4, memory: 16 * 1024, storage: 24 * 1024 });
 
     try {
-      const install = await vm.exec({
+      // Commands run as the image's uid 1000 user unless told otherwise; see
+      // "Linux user" below.
+      const install = await vm.linuxUser("root").exec({
         command: "corepack enable",
         timeoutMs: 60 * 1000,
       });
@@ -84,6 +86,61 @@ const setup = app
 ```
 
 Rigkit streams task console output to the CLI.
+
+## Long-running commands
+
+Freestyle caps a single `exec` at five minutes. For installs and builds that
+can run longer, `execLongCommand` starts the command detached in the guest and
+polls until it finishes:
+
+```ts
+import { execLongCommand } from "@rigkit/provider-freestyle";
+
+const result = await execLongCommand(vm.linuxUser("root"), {
+  command: "pnpm install --frozen-lockfile",
+  timeoutMs: 20 * 60 * 1000,
+  onOutput: (chunk) => console.log(chunk.trimEnd()),
+});
+if (result.timedOut || (result.statusCode ?? 0) !== 0) {
+  throw new Error(`Install failed:\n${result.stdout}`);
+}
+```
+
+## Linux user
+
+`vm.exec(...)`, `pty`, and terminal sessions run as the VM's default user: the
+account holding uid 1000 (`ubuntu` on the Freestyle base image), or `root` in
+an image with no such account. That user has passwordless `sudo`, but it cannot
+write `/root`, `/workspace`, or system paths directly.
+
+Pick one user for a setup and use it everywhere, so files written during setup
+are readable by later tasks, terminals, and editors. To run as root:
+
+```ts
+const root = vm.linuxUser("root");
+await root.exec("apt-get install -y gh");
+
+await providers.freestyle.terminal.open("Log in to GitHub", {
+  vmId,
+  linuxUser: "root",
+  command: "gh auth login --web",
+});
+```
+
+`providers.freestyle.terminal.open` runs over the VM's PTY and takes
+`linuxUser`. The separate [terminal provider](/providers/terminal) connects over
+SSH instead, so pass `user` through `createSSHOptions`:
+
+```ts
+await providers.terminal.open("Log in to GitHub", {
+  ssh: await providers.freestyle.createSSHOptions({ vmId, user: "root" }),
+  command: "gh auth login --web",
+  keepOpenAfterCommand: true,
+});
+```
+
+`createSSHOptions`, `cmux.createSshOptions`, and `vscode.createUrl` accept a
+`user` option and default to `root`.
 
 ## Create workspace VMs
 
@@ -126,15 +183,13 @@ provider-owned token connection. Project code does not manage SSH keys.
 ## cmux and VS Code
 
 ```ts
-await providers.cmux.open({
-  name: workspace.name,
-  ssh: await providers.freestyle.cmux.createSshOptions({
+const cmuxWorkspace = await providers.cmux.ssh({
+  ...(await providers.freestyle.cmux.createSshOptions({
     vmId: workspace.ctx.vmId,
-  }),
-  cwd: workspace.ctx.repoPath,
-  terminals: [{ command: "pnpm dev" }],
-  url: "http://localhost:3000",
+  })),
+  name: workspace.name,
 });
+await providers.cmux.selectWorkspace(cmuxWorkspace.workspaceId);
 ```
 
 ```ts
@@ -153,11 +208,16 @@ types commonly used by configs:
 
 ```ts
 import {
+  execLongCommand,
   freestyle,
   Freestyle,
+  type FirewallSpec,
   type FreestyleSdkVm,
 } from "@rigkit/provider-freestyle";
 ```
+
+The `freestyle` SDK package is a peer dependency, so it must be installed
+alongside the provider.
 
 ## Patterns
 

@@ -9,17 +9,7 @@ environments. The workflow prepares durable context. Workspaces use that
 context to create named resources. Operations let humans and agents work with
 those resources.
 
-```mermaid
-flowchart TD
-  Config["rigkit/index.ts"] --> Plan["rig plan"]
-  Config --> Apply["rig apply"]
-  Apply --> Cache["Cached workflow context"]
-  Cache --> Workspace["rig create <workspace>"]
-  Workspace --> Run["rig run <workspace> <operation>"]
-  Run --> Agent["Agent"]
-  Run --> Developer["Developer"]
-  Run --> CI["CI or tests"]
-```
+<ConceptsFlowDiagram />
 
 The important shift is that the environment is the artifact. Agents,
 developers, and automation all start from the same prepared state instead of
@@ -68,16 +58,7 @@ export const appWorkflow = app.sequence("app").add(base);
 
 Sequences and parallel branches compile into a graph:
 
-```mermaid
-flowchart LR
-  Base["base image"] --> Tooling["install tooling"]
-  Tooling --> Repo["setup repo"]
-  Tooling --> Auth["provision database"]
-  Repo --> Join["final context"]
-  Auth --> Join
-  Join --> Workspace["workspace.create"]
-  Workspace --> Ops["open, ssh, test, status"]
-```
+<WorkflowGraphDiagram />
 
 ## Task
 
@@ -170,18 +151,20 @@ rig run alice ssh
 rig run alice status --json
 ```
 
-Workflow-level operations are not tied to one workspace. They are useful for
-project-wide actions or commands that select their target through input.
+Workflow-level operations, defined with `.operation(...)`, are not tied to one
+workspace. They are useful for project-wide actions or commands that select
+their target through input.
 
-Operation ids share a namespace with Rigkit host commands, so built-in ids such
-as `plan`, `apply`, `create`, `run`, and `help` are reserved.
+Operation ids share a namespace with Rigkit host commands. These ids are
+reserved: `apply`, `completion`, `create`, `doctor`, `fork`, `help`, `init`,
+`ls`, `plan`, `projects`, `remove`, `run`, and `version`.
 
 ## Cache
 
 Rigkit caches task output. A cached task can be reused when the engine finds a
 matching node run for the current task path, task function, config stack,
-scoped provider fingerprint, output schema, upstream run ids, cache TTL, and
-artifact validity.
+scoped provider fingerprint, output schema, and upstream run ids, and that run
+is still inside its `cacheTTL` with its provider artifacts intact.
 
 The practical result:
 
@@ -190,12 +173,14 @@ The practical result:
 - Use cache commands when you need to invalidate or clear state manually.
 
 ```sh
-rig cache dev ls
-rig cache dev explain
-rig cache dev invalidate clone-repo
-rig cache dev invalidate --all
-rig cache dev clear --local
+rig cache website ls
+rig cache website explain
+rig cache website invalidate clone-repo
+rig cache website invalidate --all
+rig cache website clear --local
 ```
+
+The first argument after `cache` is the workflow name.
 
 ## Fragment
 
@@ -221,7 +206,7 @@ The host side provides local capabilities such as:
 - opening URLs;
 - running trusted local commands;
 - presenting provider-owned interaction URLs;
-- registering capabilities such as `cmux.open`.
+- registering capabilities such as `cmux.call`.
 
 This split lets provider code run in the project runtime while sensitive local
 actions stay behind an explicit host boundary.

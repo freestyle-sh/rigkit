@@ -1,0 +1,126 @@
+---
+// Static SVG for the Concepts page: config -> plan/apply -> cached context ->
+// workspaces -> operations -> consumers. Replaces a Mermaid fence, which the
+// docs site has no renderer for.
+import "@/styles/diagram.css";
+---
+
+<figure class="docs-diagram" role="group" aria-label="Rigkit flow from config to workspaces">
+  <svg
+    viewBox="0 0 660 340"
+    role="img"
+    aria-labelledby="concepts-flow-title concepts-flow-desc"
+    preserveAspectRatio="xMidYMid meet"
+  >
+    <title id="concepts-flow-title">From config to workspaces</title>
+    <desc id="concepts-flow-desc">
+      rigkit/index.ts is previewed by rig plan and prepared by rig apply, which stores cached
+      workflow context. rig create uses that context to create named workspaces. rig run runs
+      operations against a workspace for agents, developers, and CI or tests.
+    </desc>
+
+    <defs>
+      <marker
+        id="concepts-arrow-ink"
+        class="dg-marker--ink"
+        viewBox="0 0 10 10"
+        refX="8.5"
+        refY="5"
+        markerWidth="9"
+        markerHeight="9"
+        markerUnits="userSpaceOnUse"
+        orient="auto-start-reverse"
+      >
+        <path d="M0,0 L10,5 L0,10 z"></path>
+      </marker>
+      <marker
+        id="concepts-arrow-muted"
+        class="dg-marker--muted"
+        viewBox="0 0 10 10"
+        refX="8"
+        refY="5"
+        markerWidth="8"
+        markerHeight="8"
+        markerUnits="userSpaceOnUse"
+        orient="auto-start-reverse"
+      >
+        <path d="M0,0 L10,5 L0,10 z"></path>
+      </marker>
+    </defs>
+
+    <!-- Preview edge: config -> rig plan -->
+    <g class="dg-edge dg-edge--muted">
+      <path d="M89,76 V48 H214" marker-end="url(#concepts-arrow-muted)"></path>
+    </g>
+
+    <!-- Main edges -->
+    <g class="dg-edge">
+      <path d="M164,100 H214" marker-end="url(#concepts-arrow-ink)"></path>
+      <path d="M326,100 H380" marker-end="url(#concepts-arrow-ink)"></path>
+      <path d="M470,126 V160 H120 V196" marker-end="url(#concepts-arrow-ink)"></path>
+      <path d="M226,220 H270" marker-end="url(#concepts-arrow-ink)"></path>
+      <path d="M401,244 V262 H251 V280" marker-end="url(#concepts-arrow-ink)"></path>
+      <path d="M401,244 V280" marker-end="url(#concepts-arrow-ink)"></path>
+      <path d="M401,244 V262 H551 V280" marker-end="url(#concepts-arrow-ink)"></path>
+    </g>
+
+    <!-- Edge labels -->
+    <g class="dg-edge-label">
+      <text x="295" y="160">final workflow context</text>
+    </g>
+
+    <!-- Row 1: config, plan, apply, cached context -->
+    <g class="dg-node dg-node--mono">
+      <rect x="14" y="76" width="150" height="48" rx="10"></rect>
+      <text x="89" y="100">rigkit/index.ts</text>
+    </g>
+
+    <g class="dg-node dg-node--mono dg-node--muted">
+      <rect x="214" y="28" width="112" height="40" rx="10"></rect>
+      <text x="270" y="48">rig plan</text>
+    </g>
+    <g class="dg-edge-label">
+      <text x="338" y="48" style="text-anchor: start">preview only</text>
+    </g>
+
+    <g class="dg-node dg-node--mono dg-node--primary">
+      <rect x="214" y="80" width="112" height="40" rx="10"></rect>
+      <text x="270" y="100">rig apply</text>
+    </g>
+
+    <g class="dg-node">
+      <rect x="380" y="74" width="180" height="52" rx="10"></rect>
+      <text x="470" y="93">Cached workflow</text>
+      <text x="470" y="110">context</text>
+    </g>
+
+    <!-- Row 2: create (stacked to show many workspaces), run -->
+    <g class="dg-stack">
+      <rect x="22" y="204" width="212" height="48" rx="10"></rect>
+      <rect x="18" y="200" width="212" height="48" rx="10"></rect>
+    </g>
+    <g class="dg-node dg-node--mono">
+      <rect x="14" y="196" width="212" height="48" rx="10"></rect>
+      <text x="120" y="220">rig create &lt;workspace&gt;</text>
+    </g>
+
+    <g class="dg-node dg-node--mono">
+      <rect x="270" y="196" width="262" height="48" rx="10"></rect>
+      <text x="401" y="220">rig run &lt;workspace&gt; &lt;operation&gt;</text>
+    </g>
+
+    <!-- Row 3: consumers -->
+    <g class="dg-node dg-node--terminal">
+      <rect x="191" y="280" width="120" height="40" rx="20"></rect>
+      <text x="251" y="300">Agent</text>
+    </g>
+    <g class="dg-node dg-node--terminal">
+      <rect x="341" y="280" width="120" height="40" rx="20"></rect>
+      <text x="401" y="300">Developer</text>
+    </g>
+    <g class="dg-node dg-node--terminal">
+      <rect x="491" y="280" width="120" height="40" rx="20"></rect>
+      <text x="551" y="300">CI or tests</text>
+    </g>
+  </svg>
+</figure>

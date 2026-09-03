@@ -3,13 +3,14 @@ import { render, type CollectionEntry } from "astro:content";
 import Card from "@/components/docs/Card.astro";
 import CardGroup from "@/components/docs/CardGroup.astro";
 import CodeGroup from "@/components/docs/CodeGroup.astro";
+import ConceptsFlowDiagram from "@/components/docs/ConceptsFlowDiagram.astro";
 import DocsLayout from "@/layouts/DocsLayout.astro";
 import Note from "@/components/docs/Note.astro";
 import OverviewCards from "@/components/docs/OverviewCards.astro";
 import SearchIntent from "@/components/docs/SearchIntent.astro";
 import Tip from "@/components/docs/Tip.astro";
 import Update from "@/components/docs/Update.astro";
-import VmLifecycleDiagram from "@/components/docs/VmLifecycleDiagram.astro";
+import WorkflowGraphDiagram from "@/components/docs/WorkflowGraphDiagram.astro";
 
 interface Props {
   entry: CollectionEntry<"docs">;
@@ -41,12 +42,13 @@ const isCurrentOverview = entry.id === "index";
       Card,
       CardGroup,
       CodeGroup,
+      ConceptsFlowDiagram,
       Note,
       OverviewCards,
       SearchIntent,
       Tip,
       Update,
-      VmLifecycleDiagram,
+      WorkflowGraphDiagram,
     }}
   />
 </DocsLayout>

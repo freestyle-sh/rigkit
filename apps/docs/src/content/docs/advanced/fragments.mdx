@@ -62,10 +62,11 @@ export const baseDependencies = sequence("base-dependencies")
   });
 ```
 
-Use it from a workflow:
+Use it from a workflow. Rigkit only loads named exports from
+`rigkit/index.ts`, so export the composed node under a name:
 
 ```ts
-export default sequence("api")
+export const api = sequence("api")
   .add(baseDependencies)
   .task("install-api", async ({ step }) => ({
     ctx: {
@@ -85,7 +86,7 @@ Call `.global()` when the same fragment should be cached outside the local
 workflow state:
 
 ```ts
-export default sequence("api")
+export const api = sequence("api")
   .add(baseDependencies.global())
   .task("install-api", async ({ step }) => ({
     ctx: {
@@ -156,7 +157,7 @@ export function serviceWorkflow(options: ServiceOptions) {
 Use the factory from named configs:
 
 ```ts
-export default serviceWorkflow({
+export const api = serviceWorkflow({
   id: "api",
   packageName: "@acme/api",
   sourceDir: "services/api",
@@ -209,7 +210,9 @@ import {
   type FreestyleCompanyBaseFragmentContext,
 } from "@rigkit/fragments";
 import { freestyle } from "@rigkit/provider-freestyle";
+import { workflow } from "@rigkit/sdk";
 
+const app = workflow("project");
 const freestyleProvider = freestyle.provider();
 
 const projectSetup = app
@@ -226,7 +229,7 @@ const projectSetup = app
     });
 
     try {
-      await vm.exec("mkdir -p /workspace/app");
+      await vm.linuxUser("root").exec("mkdir -p /workspace/app");
       const snapshot = await vm.snapshot();
       return {
         ctx: {
@@ -251,13 +254,17 @@ The wrapped setup must preserve `freestyleCompanyBase` in its returned context.
 The fragment types enforce that contract so the trailing auth check can still
 read the base metadata after repo-specific setup adds fields.
 
+The base runs `install-tooling`, `github-auth`, `codex-auth`, and
+`claude-auth` tasks. The trailing `check-auth` task runs on every apply and
+calls `step.invalidate("github-auth")` when `gh auth status` fails.
+
 ## Invalidate shared auth from a later check
 
 Wrapper fragments can run a local uncached check after repo setup and invalidate
 an earlier global task if credentials are stale:
 
 ```ts
-const authCheck = sequence<BaseProviderMap, BaseContext>("base-auth-check")
+const authCheck = sequence<WorkflowProviderMap, BaseContext>("base-auth-check")
   .local()
   .task("check-auth", { cacheTTL: 0 }, async ({ step }) => {
     const ok = await checkAuth(step.ctx.snapshotId);
@@ -285,6 +292,7 @@ previous fragment's output type.
 import {
   sequence,
   type WorkflowNodeOutput,
+  type WorkflowProviderMap,
 } from "@rigkit/sdk";
 import { baseDependencies } from "./base-dependencies";
 

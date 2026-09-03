@@ -239,7 +239,7 @@ Pass an `output` schema when cached context must keep a stable shape. The schema
 can expose `parse` or `safeParse`, so Zod works:
 
 ```ts
-import { z } from "/sdk";
+import { z } from "@rigkit/sdk";
 
 const prepared = app.sequence("prepared").task(
   "prepare",
@@ -273,8 +273,13 @@ Use `cacheTTL` when output expires:
 )
 ```
 
-Supported string units are `ms`, `s`, `m`, `h`, and `d`. `cacheTTL: 0` makes a
+Supported string units are `ms`, `s`, `m`, `h`, and `d`. A bare number is
+milliseconds, and `{ hours: 12 }` style objects also work. `cacheTTL: 0` makes a
 task run on every apply.
+
+`cacheTTL` is an expiry check on an existing cached run, not part of the cache
+key. Changing only the TTL does not rerun a task that is still fresh; use
+`rig cache <workflow> invalidate <task>` for that.
 
 Use cache commands for manual control:
 

@@ -24,9 +24,15 @@ rig version
 ```sh
 mkdir website
 cd website
-pnpm add -D @rigkit/sdk @rigkit/provider-freestyle @rigkit/provider-cmux freestyle
 rig init
 ```
+
+`rig init` writes `rigkit/index.ts`, adds `@rigkit/sdk`,
+`@rigkit/provider-freestyle`, and `@rigkit/provider-cmux` to `package.json`
+(creating it if needed), then asks which package manager should install them.
+Pass `--package-manager pnpm` to skip the question or `--no-install` to only
+write files. It does not write `.env` or ignore rules, so add `.rigkit/` to
+`.gitignore` yourself.
 
 <Note>
 Agents, CI, and other non-interactive callers can parse JSON:
@@ -35,16 +41,10 @@ Agents, CI, and other non-interactive callers can parse JSON:
 rig --json init
 ```
 
-Use `--json` on later commands, and use `--yes` when removing workspaces.
+JSON mode skips dependency installation. Use `--json` on later commands, and
+use `--yes` when removing workspaces.
 
 </Note>
-
-`rig init` creates:
-
-- `rigkit/index.ts`
-
-It does not prompt and does not write package metadata, environment files, or
-ignore rules.
 
 The generated config uses Freestyle browser login by default:
 
@@ -64,13 +64,18 @@ const freestyleProvider = freestyle.provider({
 
 ## What was generated
 
-The starter config prepares a Node.js 22 Freestyle VM, installs GitHub CLI,
-opens a browser-backed `gh auth login` terminal when needed, clones
-`octocat/Hello-World`, and snapshots the result.
+The starter config exports one workflow named `dev` with three tasks. It
+prepares a Freestyle VM (the base image ships Node.js, bun, and git) and
+installs GitHub CLI, opens a browser-backed `gh auth login` terminal when the
+VM is not yet authenticated, and clones `octocat/Hello-World`. Each task
+snapshots the VM and passes the snapshot id forward.
+Every command, terminal, and editor session in it runs as `root`; see
+[Linux user](/providers/freestyle#linux-user) for why that is stated
+explicitly.
 
 It also defines workspace lifecycle hooks plus `ssh`, `open-cmux`, and
-`open-vscode` operations. The persisted values are the snapshot id, workspace
-VM id, and cloned repository path.
+`open-vscode` operations. The workflow context stores the snapshot id and
+cloned repository path; each workspace stores its VM id.
 
 ## Plan and apply
 
@@ -80,13 +85,14 @@ rig apply
 rig plan
 ```
 
-The first plan shows the setup task as pending. `rig apply` runs it and stores
-the task output in `.rigkit/state.sqlite`. The second plan should show the task
-as cached.
+The first plan shows the three tasks as pending. `rig apply` runs them and
+stores each task's output in `.rigkit/state.sqlite`. The second plan should
+show every task as cached.
 
-Cached setup is reused until a cache input changes: task code, provider config
-in scope for the task, upstream task output, output schema, `cacheTTL`, provider
-artifact validation, or manual invalidation.
+Cached output is reused until something it depends on changes: task code,
+provider config in scope for the task, upstream task output, or the output
+schema. It is also dropped when a `cacheTTL` expires, a provider reports a
+cached artifact as gone, or you invalidate it by hand.
 
 ## Create a workspace
 
@@ -95,8 +101,8 @@ rig create dev
 rig ls
 ```
 
-`rig create` runs `apply` first if setup is stale, then calls
-`workspace.create`. Remove the workspace when you are done:
+`rig create` always runs `apply` first, which is a no-op when everything is
+cached, then calls `workspace.create`. Remove the workspace when you are done:
 
 ```sh
 rig rm dev

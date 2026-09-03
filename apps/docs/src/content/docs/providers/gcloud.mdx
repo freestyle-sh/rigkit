@@ -48,10 +48,10 @@ import {
 const gcloudConfigFiles = await providers.gcloudConfig.configFiles();
 
 for (const step of gcloudConfigCopyInjectionSteps(gcloudConfigFiles)) {
-  await vm.exec(step.command, {
-    name: step.name,
-    env: step.env,
-  });
+  const result = await vm.exec({ command: step.command, env: step.env });
+  if ((result.statusCode ?? 0) !== 0) {
+    throw new Error(`${step.name} failed:\n${result.stderr}`);
+  }
 }
 
 const verified = await vm.exec(gcloudCopiedConfigReadyCommand());
