@@ -16,13 +16,5 @@ export const DOCS_VERSIONS: ConfiguredDocsVersion[] = [
     "startPath": "/docs",
     "binding": "DOCS_LATEST",
     "current": true
-  },
-  {
-    "version": "v0.2",
-    "label": "v0.2 · v0.2.17",
-    "basePath": "/docs/v0.2",
-    "startPath": "/docs/v0.2",
-    "binding": "DOCS_V0_2",
-    "archive": true
   }
 ];
