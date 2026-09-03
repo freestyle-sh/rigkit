@@ -107,14 +107,14 @@ describe("Freestyle provider host auth", () => {
       });
       expect(requests).toEqual([
         {
-          url: "https://beta-api.freestyle.sh/v5/identities",
+          url: "https://api.freestyle.sh/v5/identities",
           method: "POST",
           authorization: "Bearer object-api-key",
           rigkit: "true",
           rigkitVersion: RIGKIT_PROVIDER_FREESTYLE_VERSION,
         },
         {
-          url: "https://beta-api.freestyle.sh/v5/identities/identity-api-key/tokens",
+          url: "https://api.freestyle.sh/v5/identities/identity-api-key/tokens",
           method: "POST",
           authorization: "Bearer object-api-key",
           rigkit: "true",
@@ -167,7 +167,7 @@ describe("Freestyle provider host auth", () => {
       if (url.href === "https://api.stack-auth.com/api/v1/auth/sessions/current/refresh") {
         return Response.json({ access_token: "stack-access-token", refresh_token: "refresh-token-rotated" });
       }
-      if (url.origin === "https://beta-api.freestyle.sh") {
+      if (url.origin === "https://api.freestyle.sh") {
         const headers = new Headers(init?.headers);
         apiRequests.push({
           path: url.pathname,
@@ -338,7 +338,7 @@ describe("Freestyle provider host auth", () => {
           ],
         });
       }
-      if (url.origin === "https://beta-api.freestyle.sh") {
+      if (url.origin === "https://api.freestyle.sh") {
         const headers = new Headers(init?.headers);
         apiRequests.push({
           path: url.pathname,
@@ -446,7 +446,7 @@ describe("Freestyle provider host auth", () => {
           teams,
         });
       }
-      if (url.origin === "https://beta-api.freestyle.sh") {
+      if (url.origin === "https://api.freestyle.sh") {
         if (url.pathname === "/v5/identities") {
           identityTeamIds.push(new Headers(init?.headers).get("x-freestyle-team-id"));
           return Response.json({ id: `identity-${identityTeamIds.length}`, managed: false });
@@ -536,7 +536,7 @@ describe("Freestyle provider host auth", () => {
           teams: [{ teamId: "team_123", name: "Team", role: "admin" }],
         });
       }
-      if (url.origin === "https://beta-api.freestyle.sh") {
+      if (url.origin === "https://api.freestyle.sh") {
         if (url.pathname === "/v5/identities") {
           return Response.json({ id: "identity-browser", managed: false });
         }
@@ -590,7 +590,7 @@ describe("Freestyle SDK fetch", () => {
     ));
 
     const messages = await captureConsoleError(async () => {
-      const response = await sdkFetch("https://beta-api.freestyle.sh/v5/vms", {
+      const response = await sdkFetch("https://api.freestyle.sh/v5/vms", {
         method: "POST",
         headers: {
           Authorization: "Bearer real-api-key",
@@ -606,7 +606,7 @@ describe("Freestyle SDK fetch", () => {
     });
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain('await fetch("https://beta-api.freestyle.sh/v5/vms", {');
+    expect(messages[0]).toContain('await fetch("https://api.freestyle.sh/v5/vms", {');
     expect(messages[0]).toContain('"Authorization": "Bearer <redacted FREESTYLE_API_KEY>"');
     expect(messages[0]).toContain('"snapshotId": "freestyle/ubuntu"');
     expect(messages[0]).toContain('"apiKey": "[redacted]"');
@@ -638,7 +638,7 @@ describe("Freestyle SDK fetch", () => {
       return Response.json({ error: "unexpected request" }, { status: 500 });
     }));
 
-    const first = await sdkFetch("https://beta-api.freestyle.sh/v5/vms", {
+    const first = await sdkFetch("https://api.freestyle.sh/v5/vms", {
       method: "POST",
       headers: {
         Authorization: "Bearer real-api-key",
@@ -651,7 +651,7 @@ describe("Freestyle SDK fetch", () => {
     expect(first.status).toBe(202);
 
     const messages = await captureConsoleError(async () => {
-      const failed = await sdkFetch("https://beta-api.freestyle.sh/v5/background-requests/ri_test_123", {
+      const failed = await sdkFetch("https://api.freestyle.sh/v5/background-requests/ri_test_123", {
         method: "GET",
         headers: {
           Authorization: "Bearer real-api-key",
@@ -663,7 +663,7 @@ describe("Freestyle SDK fetch", () => {
 
     expect(messages).toHaveLength(1);
     expect(messages[0]).toContain("Freestyle background request ri_test_123 failed. Original API request:");
-    expect(messages[0]).toContain('await fetch("https://beta-api.freestyle.sh/v5/vms", {');
+    expect(messages[0]).toContain('await fetch("https://api.freestyle.sh/v5/vms", {');
     expect(messages[0]).toContain('method: "POST"');
     expect(messages[0]).toContain('"Authorization": "Bearer <redacted FREESTYLE_API_KEY>"');
     expect(messages[0]).toContain('"snapshotId": "freestyle/ubuntu"');

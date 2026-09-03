@@ -10,7 +10,8 @@
     "worker:dev": "wrangler dev",
     "worker:deploy": "astro build && wrangler deploy",
     "typecheck": "astro check && tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "og:render": "sh og/render.sh"
   },
   "dependencies": {
     "@astrojs/react": "^5.0.4",
@@ -29,7 +30,7 @@
     "@types/bun": "latest",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "typescript": "latest",
+    "typescript": "^6.0.3",
     "wrangler": "latest"
   }
 }

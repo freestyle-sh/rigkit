@@ -401,7 +401,7 @@ function ctx(): ExecutionContext {
     waitUntil: () => undefined,
     passThroughOnException: () => undefined,
     props: undefined,
-  } as ExecutionContext;
+  } as unknown as ExecutionContext;
 }
 
 function mockGithubFetch(): Array<{ url: string; headers: Headers }> {
