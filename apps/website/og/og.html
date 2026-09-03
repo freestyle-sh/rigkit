@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+<style>
+  :root {
+    --bg: #efece5; --surface: #fff; --fg: #0a0a0a; --muted: #5a5a5a; --dim: #8e8a80;
+    --border: #d8d2c5; --accent: #2d4df5;
+    --sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+  .card { position: relative; width: 1200px; height: 630px; padding: 56px 64px 56px; display: flex; flex-direction: column; justify-content: space-between; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; font-family: var(--mono); }
+  .brand { display: flex; align-items: baseline; gap: 12px; }
+  .brand .name { font-size: 26px; font-weight: 500; letter-spacing: -0.01em; }
+  .brand .ver { font-size: 18px; font-weight: 500; color: var(--accent); }
+  .url { font-size: 20px; color: var(--dim); }
+  h1 { font-size: 88px; font-weight: 800; line-height: 1.0; letter-spacing: -0.04em; white-space: nowrap; }
+  .sub { margin-top: 30px; font-size: 26px; line-height: 1.4; color: #2a2a2a; max-width: 900px; letter-spacing: -0.01em; }
+  .bottom { display: flex; align-items: center; justify-content: space-between; gap: 32px; }
+  .install { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 2px solid var(--border); border-radius: 18px; padding: 18px 26px; font-family: var(--mono); font-size: 25px; }
+  .install .dollar { color: var(--dim); }
+  .install .cmd { color: var(--fg); }
+  .built { font-family: var(--mono); font-size: 20px; color: var(--dim); }
+  .built b { font-weight: 500; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="top">
+    <div class="brand"><span class="name">rigkit</span><span class="ver">v0.3</span></div>
+    <div class="url">www.rigkit.dev</div>
+  </div>
+  <div>
+    <h1>Developer environments<br/>as code.</h1>
+    <p class="sub">Define your whole dev environment in TypeScript. Snapshot it once, then fork it into ten agents that boot already authenticated.</p>
+  </div>
+  <div class="bottom">
+    <div class="install"><span class="dollar">$</span><span class="cmd">curl -fsSL https://www.rigkit.dev/install | sh</span></div>
+    <div class="built">Built by <b>Freestyle</b></div>
+  </div>
+</div>
+</body>
+</html>
