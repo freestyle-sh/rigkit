@@ -11,7 +11,7 @@ import {
 } from "../lib/config";
 import { dirname, shellQuote } from "../lib/shell";
 import type { SnapshotContext, WebsiteContext } from "../lib/types";
-import { execOrThrow } from "../lib/vm";
+import { asVmUser, execOrThrow } from "../lib/vm";
 import type { SetupTaskHandler } from "./types";
 
 export const cloneAndInstallTask: SetupTaskHandler<
@@ -25,13 +25,14 @@ export const cloneAndInstallTask: SetupTaskHandler<
   });
   const { vmId } = created;
   const { vm } = created;
+  const shell = asVmUser(vm);
 
   try {
-    const cloned = await vm.exec(`test -d ${shellQuote(repoPath + "/.git")}`);
+    const cloned = await shell.exec(`test -d ${shellQuote(repoPath + "/.git")}`);
 
     if ((cloned.statusCode ?? 0) !== 0) {
       console.log("cloning website repo");
-      await execOrThrow(vm, "website repo clone", {
+      await execOrThrow(shell, "website repo clone", {
         command: [
           "set -e",
           `export HOME=${shellQuote(vmHome)}`,
@@ -43,7 +44,7 @@ export const cloneAndInstallTask: SetupTaskHandler<
     }
 
     console.log("installing website dependencies");
-    await execOrThrow(vm, "website dependency install", {
+    await execOrThrow(shell, "website dependency install", {
       command: [
         "set -e",
         `export HOME=${shellQuote(vmHome)}`,

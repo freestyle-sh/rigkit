@@ -3,7 +3,7 @@ import {
   attachDevServerLogCommand,
   startDevServerCommand,
 } from "./lib/commands";
-import { vmFirewall, vmIdleTimeoutSeconds } from "./lib/config";
+import { vmFirewall, vmIdleTimeoutSeconds, vmUser } from "./lib/config";
 import {
   cmuxProvider,
   freestyleProvider,
@@ -22,7 +22,7 @@ import {
   verifySystemDependenciesTask,
 } from "./tasks/install-dependencies";
 import { updateCodexCliAndEnableGoalTask } from "./tasks/update-codex-cli-and-enable-goal";
-import { execOrThrow, waitForLocalhostHtml } from "./lib/vm";
+import { asVmUser, execOrThrow, waitForLocalhostHtml } from "./lib/vm";
 
 const app = workflow("freestyle-website-next");
 
@@ -77,10 +77,10 @@ export const freestyleWebsiteNext = app
         idleTimeoutSeconds: vmIdleTimeoutSeconds,
       });
       const { vmId } = created;
-      const { vm } = created;
+      const shell = asVmUser(created.vm);
       try {
         const branch = `rigkit/${workspace.name.replaceAll(/[^A-Za-z0-9._/-]/g, "-")}`;
-        const result = await vm.exec(
+        const result = await shell.exec(
           [
             "set -e",
             `cd ${shellQuote(workflow.ctx.repoPath)}`,
@@ -94,7 +94,7 @@ export const freestyleWebsiteNext = app
         }
         // The setup snapshot no longer bakes in a running dev server (shpool is
         // gone), so start it here in the freshly forked workspace VM.
-        await execOrThrow(vm, "website dev server start", {
+        await execOrThrow(shell, "website dev server start", {
           command: startDevServerCommand({
             repoPath: workflow.ctx.repoPath,
             command: workflow.ctx.devCommand,
@@ -102,7 +102,7 @@ export const freestyleWebsiteNext = app
           timeoutMs: 60 * 1000,
         });
         await waitForLocalhostHtml(
-          vm,
+          shell,
           workflow.ctx.devPort,
           workflow.ctx.devHostname,
         );
@@ -133,6 +133,7 @@ export const freestyleWebsiteNext = app
       const cmuxWorkspace = await providers.cmux.ssh({
         ...(await providers.freestyle.cmux.createSshOptions({
           vmId: workspace.ctx.vmId,
+          user: vmUser,
         })),
         name: workspace.name,
       });
@@ -180,6 +181,7 @@ export const freestyleWebsiteNext = app
     run: async ({ providers, workspace, local }) => {
       const url = await providers.freestyle.vscode.createUrl({
         vmId: workspace.ctx.vmId,
+        user: vmUser,
         cwd: workspace.ctx.repoPath,
       });
       await local.open(url);
@@ -192,6 +194,7 @@ export const freestyleWebsiteNext = app
       await providers.terminal.open(`SSH ${workspace.name}`, {
         ssh: await providers.freestyle.createSSHOptions({
           vmId: workspace.ctx.vmId,
+          user: vmUser,
         }),
         command: `cd ${shellQuote(workspace.ctx.repoPath)} && exec bash -l`,
         keepOpenAfterCommand: true,

@@ -4,7 +4,7 @@ import {
 } from "@rigkit/provider-freestyle";
 import { vmFirewall, vmHome, vmIdleTimeoutSeconds } from "../lib/config";
 import type { SnapshotContext } from "../lib/types";
-import { execOrThrow } from "../lib/vm";
+import { asVmUser, execOrThrow } from "../lib/vm";
 import type { SetupTaskHandler } from "./types";
 
 // Detected once at definition load. Remote-SSH downloads a server matching
@@ -35,7 +35,7 @@ export const setupVscodeTask: SetupTaskHandler<
     idleTimeoutSeconds: vmIdleTimeoutSeconds,
   });
   try {
-    await execOrThrow(vm, "VS Code server preinstall", {
+    await execOrThrow(asVmUser(vm), "VS Code server preinstall", {
       command: installVscodeServerCommand({
         commit: localVscode.commit,
         home: vmHome,

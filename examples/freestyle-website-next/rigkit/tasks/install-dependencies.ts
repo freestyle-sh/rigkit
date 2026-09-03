@@ -5,7 +5,7 @@ import {
   verifySystemDependenciesCommand,
 } from "../lib/commands";
 import type { SnapshotContext } from "../lib/types";
-import { execOrThrow } from "../lib/vm";
+import { asVmUser, execOrThrow } from "../lib/vm";
 import type { SetupTaskHandler } from "./types";
 
 type SnapshotStageInput = {
@@ -26,7 +26,7 @@ async function runSnapshotStage(
   });
 
   try {
-    await execOrThrow(vm, input.label, {
+    await execOrThrow(asVmUser(vm), input.label, {
       command: input.command,
       timeoutMs: input.timeoutMs,
     });

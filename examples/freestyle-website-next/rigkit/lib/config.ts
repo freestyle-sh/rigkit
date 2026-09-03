@@ -7,6 +7,10 @@ export const repoPath = "/workspace/freestyle-website-next";
 export const devAppPort = 4321;
 export const devRouteName = "freestyle-website";
 export const vmIdleTimeoutSeconds = 43200;
+// Freestyle runs commands as the image's uid 1000 user (`ubuntu`) unless told
+// otherwise. This setup installs system packages and keeps tool auth under
+// /root, so every exec, terminal, SSH, and editor session runs as root.
+export const vmUser = "root";
 export const vmHome = "/root";
 
 export const devEnvironmentPath =

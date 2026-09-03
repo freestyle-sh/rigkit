@@ -175,6 +175,12 @@ const vmFirewall: FirewallSpec = {
 const freestyleProvider = freestyle.provider();
 const terminalProvider = freestyle.terminal();
 
+// Freestyle runs commands as the image's uid 1000 user (\`ubuntu\` on the base
+// image) unless told otherwise. This starter installs system packages and keeps
+// GitHub auth under /root, so every command runs as root; SSH, cmux, and
+// VS Code sessions connect as root too.
+const vmUser = "root";
+
 export const dev = workflow(${workflowName})
   .sequence("dev")
   .addProvider("freestyle", freestyleProvider)
@@ -185,10 +191,11 @@ export const dev = workflow(${workflowName})
       firewall: vmFirewall,
       idleTimeoutSeconds: vmIdleTimeoutSeconds,
     });
+    const root = vm.linuxUser(vmUser);
     try {
       // Freestyle caps one exec at five minutes; execLongCommand runs longer
       // jobs detached in the guest and polls until they finish.
-      const dependencies = await execLongCommand(vm, {
+      const dependencies = await execLongCommand(root, {
         command: installDependenciesCommand(),
         timeoutMs: 10 * 60 * 1000,
         onOutput: (chunk) => console.log(chunk.trimEnd()),
@@ -197,9 +204,12 @@ export const dev = workflow(${workflowName})
         throw new Error(\`Base dependency install \${dependencies.timedOut ? "timed out" : "failed"}:\\n\${dependencies.stdout}\`.trim());
       }
 
-      const result = await vm.exec("node --version");
-      if ((result.statusCode ?? 0) !== 0 || !(result.stdout ?? "").trim().startsWith("v22.")) {
-        throw new Error(\`Expected Node.js v22, got: \${result.stdout}\${result.stderr}\`);
+      // The base image ships Node.js, bun, and git; only confirm Node.js is
+      // recent enough for the tools this workflow runs.
+      const result = await root.exec("node --version");
+      const nodeMajor = Number((result.stdout ?? "").trim().replace(/^v/, "").split(".")[0]);
+      if ((result.statusCode ?? 0) !== 0 || !(nodeMajor >= 22)) {
+        throw new Error(\`Expected Node.js v22 or newer, got: \${result.stdout}\${result.stderr}\`);
       }
       const snapshot = await vm.snapshot();
       return { ctx: { snapshotId: snapshot.snapshotId } };
@@ -213,19 +223,20 @@ export const dev = workflow(${workflowName})
       firewall: vmFirewall,
       idleTimeoutSeconds: vmIdleTimeoutSeconds,
     });
+    const root = vm.linuxUser(vmUser);
     try {
-      const authenticated = await vm.exec(withVmHome("gh auth status -h github.com >/dev/null 2>&1"));
+      const authenticated = await root.exec(withVmHome("gh auth status -h github.com >/dev/null 2>&1"));
       if ((authenticated.statusCode ?? 0) !== 0) {
         await providers.terminal.open("Log in to GitHub", {
-          ssh: await providers.freestyle.createSSHOptions({ vmId }),
+          ssh: await providers.freestyle.createSSHOptions({ vmId, user: vmUser }),
           command: "gh auth login --hostname github.com --git-protocol https --web",
           keepOpenAfterCommand: true,
           instructions: "Complete the GitHub browser login in this terminal. After gh succeeds, type exit to continue.",
         });
 
-        const verified = await vm.exec(withVmHome("gh auth status -h github.com >/dev/null 2>&1"));
+        const verified = await root.exec(withVmHome("gh auth status -h github.com >/dev/null 2>&1"));
         if ((verified.statusCode ?? 0) !== 0) {
-          const status = await vm.exec(withVmHome("gh auth status -h github.com 2>&1"));
+          const status = await root.exec(withVmHome("gh auth status -h github.com 2>&1"));
           throw new Error(\`GitHub CLI is not authenticated:\\n\${status.stdout || status.stderr}\`.trim());
         }
       }
@@ -242,8 +253,9 @@ export const dev = workflow(${workflowName})
       firewall: vmFirewall,
       idleTimeoutSeconds: vmIdleTimeoutSeconds,
     });
+    const root = vm.linuxUser(vmUser);
     try {
-      const clone = await vm.exec({
+      const clone = await root.exec({
         command: [
           "set -e",
           \`export HOME=\${shellQuote(vmHome)}\`,
@@ -289,6 +301,7 @@ export const dev = workflow(${workflowName})
       const cmuxWorkspace = await providers.cmux.ssh({
         ...await providers.freestyle.cmux.createSshOptions({
           vmId: workspace.ctx.vmId,
+          user: vmUser,
         }),
         name: workspace.name,
       });
@@ -311,6 +324,7 @@ export const dev = workflow(${workflowName})
     run: async ({ providers, workspace, local }) => {
       const url = await providers.freestyle.vscode.createUrl({
         vmId: workspace.ctx.vmId,
+        user: vmUser,
         cwd: workspace.ctx.repoPath,
       });
       await local.open(url);
@@ -323,6 +337,7 @@ export const dev = workflow(${workflowName})
       await providers.terminal.open(\`SSH \${workspace.name}\`, {
         ssh: await providers.freestyle.createSSHOptions({
           vmId: workspace.ctx.vmId,
+          user: vmUser,
         }),
         command: \`cd \${shellQuote(workspace.ctx.repoPath)} && exec bash -l\`,
         keepOpenAfterCommand: true,
@@ -346,11 +361,8 @@ function installDependenciesCommand(): string {
     "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg",
     "chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg",
     "printf 'deb [arch=%s signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\\\\n' \\"$(dpkg --print-architecture)\\" > /etc/apt/sources.list.d/github-cli.list",
-    "curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg",
-    "chmod go+r /etc/apt/keyrings/nodesource.gpg",
-    "printf 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main\\\\n' > /etc/apt/sources.list.d/nodesource.list",
     "apt-get update -qq",
-    "apt-get install -y -qq gh nodejs",
+    "apt-get install -y -qq gh",
     "git config --system init.defaultBranch main",
     "node --version",
     "npm --version",

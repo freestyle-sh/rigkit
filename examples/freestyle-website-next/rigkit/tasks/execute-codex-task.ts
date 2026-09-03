@@ -3,7 +3,7 @@ import { devEnvironmentPath, vmHome } from "../lib/config";
 import type { WebsiteProviders } from "../lib/providers";
 import { shellQuote } from "../lib/shell";
 import type { WebsiteContext, WebsiteWorkspaceContext } from "../lib/types";
-import { execOrThrow } from "../lib/vm";
+import { asVmUser, execOrThrow } from "../lib/vm";
 
 type ExecuteCodexTaskInput = {
   task: string;
@@ -31,7 +31,7 @@ export const executeCodexTaskOperation: WorkflowWorkspaceOperationHandler<
     throw new Error("execute-codex-task requires a non-empty task string.");
   }
 
-  const vm = providers.freestyle.client.vms.ref(workspace.ctx.vmId);
+  const vm = asVmUser(providers.freestyle.client.vms.ref(workspace.ctx.vmId));
   const sessionName = `codex-task-${Date.now().toString(36)}`;
   const paths = codexTaskPaths(sessionName);
 

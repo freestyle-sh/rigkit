@@ -1,5 +1,5 @@
 import { agentCliInitCommand } from "../lib/commands";
-import { vmFirewall, vmIdleTimeoutSeconds } from "../lib/config";
+import { vmFirewall, vmIdleTimeoutSeconds, vmUser } from "../lib/config";
 import type { WebsiteContext } from "../lib/types";
 import type { SetupTaskHandler } from "./types";
 
@@ -18,6 +18,7 @@ export const initializeCodexCliTask: SetupTaskHandler<
   try {
     await providers.freestyle.terminal.open("Initialize Codex CLI", {
       vmId,
+      linuxUser: vmUser,
       command: agentCliInitCommand("codex"),
       canFinishWhileRunning: true,
       instructions:

@@ -51,6 +51,8 @@ describe("initProject", () => {
     expect(config).toContain('workflow("dev"');
     expect(config).toContain('cmux.provider()');
     expect(config).toContain('freestyle.terminal()');
+    expect(config).toContain('vm.linuxUser(vmUser)');
+    expect(config).not.toContain("vm.exec(");
     expect(config).toContain('gh auth login --hostname github.com');
     expect(config).toContain('gh repo clone ${shellQuote(repo)} ${shellQuote(repoPath)}');
     expect(config).toContain('.workspaceOperation("open-cmux"');
