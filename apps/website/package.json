@@ -10,7 +10,8 @@
     "worker:dev": "wrangler dev",
     "worker:deploy": "astro build && wrangler deploy",
     "typecheck": "astro check && tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "og:render": "sh og/render.sh"
   },
   "dependencies": {
     "@astrojs/react": "^5.0.4",
