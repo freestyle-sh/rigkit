@@ -17,8 +17,7 @@ If you're new to `rig`, these are the command sequences you'll run most often.
 ```sh
 mkdir website
 cd website
-pnpm add -D @rigkit/sdk @rigkit/provider-freestyle @rigkit/provider-cmux freestyle
-rig init
+rig init                   # write rigkit/index.ts and install the SDK
 rig plan                   # see what will run
 rig apply                  # run pending setup tasks, cache results
 ```
@@ -65,14 +64,21 @@ rig cache dev invalidate --all --yes --json
 
 Use `--json` on commands that support it instead of scraping interactive output.
 Use `--yes` only for commands that ask for confirmation: `rig rm` and
-`rig cache <workflow> invalidate --all`.
+`rig cache <workflow> invalidate --all`. Non-interactive runs fail instead of
+prompting, so pass `--workflow`, workspace names, and required operation inputs
+explicitly.
+
+When a config asks the host to run a local command, interactive terminals ask
+for approval first. Set `RIGKIT_TRUST_HOST_COMMANDS=1` to skip that prompt in
+trusted automation.
 
 The rest of this page is a reference for every command and option.
 
 ## Global options
 
-Global options come before the command. Use double-dash long flags for
-consistency with command options:
+Global options are accepted anywhere on the command line. Put them before the
+command for readability, and use double-dash long flags for consistency with
+command options:
 
 ```sh
 rig --chdir=examples/smoke plan
@@ -100,8 +106,17 @@ Initialize a project:
 rig init
 ```
 
-`rig init` creates `rigkit/index.ts` in the current directory. It does not prompt
-and does not write package metadata, environment files, or ignore rules.
+`rig init` writes `rigkit/index.ts` and adds the Rigkit packages plus `plan`
+and `apply` scripts to `package.json`, creating it if needed. It fails if
+`rigkit/index.ts` already exists. It does not write `.env` or ignore rules.
+
+Options:
+
+| Option | Description |
+| --- | --- |
+| `--package-manager <pm>` | Install with `bun`, `pnpm`, `npm`, or `skip`. Interactive terminals prompt when omitted. |
+| `--no-install` | Write files without installing dependencies. |
+| `--json` | Print JSON. Implies skipping installation. |
 
 ## `rig plan`
 
@@ -140,7 +155,8 @@ rig apply --discover
 rig apply --workflow web --json
 ```
 
-Options are the same as `plan`.
+Options are the same as `plan`, plus `--dry-run` to report what would run
+without executing tasks.
 
 ## `rig create`
 
@@ -195,6 +211,7 @@ Options:
 | --- | --- |
 | `-y`, `--yes` | Skip confirmation. |
 | `--all` | Remove every workspace in the selected project. |
+| `--workflow <name>` | Select the workflow whose workspaces to remove. |
 | `--json` | Print JSON. |
 
 `rm` calls the workflow's `workspace.remove` hook before deleting the workspace
@@ -337,8 +354,13 @@ rig run --help
 | Variable | Description |
 | --- | --- |
 | `RIGKIT_RENDER=0` | Force the plain text renderer instead of the interactive timeline. |
+| `RIGKIT_DEBUG=1` | Show debug log lines from tasks and providers. |
 | `RIGKIT_NO_CONSOLE_INTERCEPT=1` | Disable task console interception and write directly to the host terminal. |
-| `FREESTYLE_API_KEY` | Optional Freestyle API key when configs opt into API-key auth. |
+| `RIGKIT_NO_BROWSER=1` | Print interaction URLs instead of opening a browser. |
+| `RIGKIT_TRUST_HOST_COMMANDS=1` | Skip the approval prompt for config-requested local commands. |
+| `RIGKIT_HOME` | Rigkit home directory. Defaults to `~/.rigkit` and holds global fragment state. |
+| `RIGKIT_HOST_STORAGE_DIR` | Provider host storage directory. Defaults to `~/.rigkit/providers`. |
+| `FREESTYLE_API_KEY` | Freestyle API key, read only by configs that pass `env.secret("FREESTYLE_API_KEY")`. |
 | `FREESTYLE_TEAM_ID` | Select a Freestyle team without prompting during browser auth. |
 
 Project `.env` files are loaded from the selected project directory.

@@ -2,9 +2,9 @@ import {
   configureGitIdentityCommand,
   withVmHome,
 } from "../lib/commands";
-import { vmFirewall, vmIdleTimeoutSeconds } from "../lib/config";
+import { vmFirewall, vmIdleTimeoutSeconds, vmUser } from "../lib/config";
 import type { SnapshotContext } from "../lib/types";
-import { execOrThrow } from "../lib/vm";
+import { asVmUser, execOrThrow } from "../lib/vm";
 import type { SetupTaskHandler } from "./types";
 
 export const githubAuthTask: SetupTaskHandler<
@@ -18,14 +18,16 @@ export const githubAuthTask: SetupTaskHandler<
   });
   const { vmId } = created;
   const { vm } = created;
+  const shell = asVmUser(vm);
 
   try {
-    const authenticated = await vm.exec(
+    const authenticated = await shell.exec(
       withVmHome("gh auth status -h github.com >/dev/null 2>&1"),
     );
     if ((authenticated.statusCode ?? 0) !== 0) {
       await providers.freestyle.terminal.open("Log in to GitHub", {
         vmId,
+        linuxUser: vmUser,
         command: withVmHome(
           "gh auth login --hostname github.com --git-protocol https --web",
         ),
@@ -33,11 +35,11 @@ export const githubAuthTask: SetupTaskHandler<
           "Complete the GitHub device/browser login in this terminal. The task will be ready to continue when gh exits successfully.",
       });
 
-      const verified = await vm.exec(
+      const verified = await shell.exec(
         withVmHome("gh auth status -h github.com >/dev/null 2>&1"),
       );
       if ((verified.statusCode ?? 0) !== 0) {
-        const status = await vm.exec(
+        const status = await shell.exec(
           withVmHome("gh auth status -h github.com 2>&1"),
         );
         throw new Error(
@@ -47,7 +49,7 @@ export const githubAuthTask: SetupTaskHandler<
     }
 
     console.log("configuring Git author identity from GitHub account");
-    await execOrThrow(vm, "Git author identity configuration", {
+    await execOrThrow(shell, "Git author identity configuration", {
       command: configureGitIdentityCommand(),
       timeoutMs: 60 * 1000,
     });

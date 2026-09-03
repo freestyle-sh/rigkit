@@ -162,6 +162,31 @@ function renderImageMarkdown(attrs: string) {
   return `![${alt}](${src})`;
 }
 
+// The site renders these diagrams as static SVG components. The markdown
+// bundle gets the equivalent Mermaid source so text readers keep the graph.
+const conceptsFlowDiagramMarkdown = `\`\`\`mermaid
+flowchart TD
+  Config["rigkit/index.ts"] --> Plan["rig plan"]
+  Config --> Apply["rig apply"]
+  Apply --> Cache["Cached workflow context"]
+  Cache --> Workspace["rig create <workspace>"]
+  Workspace --> Run["rig run <workspace> <operation>"]
+  Run --> Agent["Agent"]
+  Run --> Developer["Developer"]
+  Run --> CI["CI or tests"]
+\`\`\``;
+
+const workflowGraphDiagramMarkdown = `\`\`\`mermaid
+flowchart LR
+  Base["base image"] --> Tooling["install tooling"]
+  Tooling --> Repo["setup repo"]
+  Tooling --> Database["provision database"]
+  Repo --> Join["final context"]
+  Database --> Join
+  Join --> Workspace["workspace.create"]
+  Workspace --> Ops["open, ssh, test, status"]
+\`\`\``;
+
 export function toPlainMarkdown(
   source: string,
   options: { preserveSearchIntents?: boolean } = {},
@@ -169,6 +194,8 @@ export function toPlainMarkdown(
   let body = stripFrontmatter(source)
     .replace(/<img\s+([^>]*)\/?>/g, (_match, attrs: string) => renderImageMarkdown(attrs))
     .replace(/<OverviewCards\s*\/>/g, overviewCardsMarkdown)
+    .replace(/<ConceptsFlowDiagram\s*\/>/g, conceptsFlowDiagramMarkdown)
+    .replace(/<WorkflowGraphDiagram\s*\/>/g, workflowGraphDiagramMarkdown)
     .replace(/<CodeGroup>\s*/g, "")
     .replace(/\s*<\/CodeGroup>/g, "")
     .replace(/<CardGroup[^>]*>\s*/g, "")

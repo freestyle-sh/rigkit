@@ -34,12 +34,13 @@ export const website = app
   .workspaceOperation("open-cmux", {
     title: "Open cmux",
     run: async ({ providers, workspace }) => {
-      await providers.cmux.open({
-        name: workspace.name,
-        ssh: await providers.freestyle.cmux.createSshOptions({
+      const cmuxWorkspace = await providers.cmux.ssh({
+        ...(await providers.freestyle.cmux.createSshOptions({
           vmId: workspace.ctx.vmId,
-        }),
+        })),
+        name: workspace.name,
       });
+      await providers.cmux.selectWorkspace(cmuxWorkspace.workspaceId);
     },
   });
 ```

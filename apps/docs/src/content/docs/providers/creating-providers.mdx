@@ -38,7 +38,7 @@ A provider package usually exports:
 - a provider definition function, built with `defineProvider(...)`;
 - a plugin with `createProvider(...)`;
 - a controller whose `runtime(...)` method returns helpers used by tasks and
-  operations.
+  operations, with optional `checks(...)` and `validateArtifact(...)` hooks.
 
 ```ts
 import {
@@ -148,7 +148,8 @@ contains one, Rigkit asks the matching provider to validate it if
 
 ## Storage
 
-`createProvider(...)` receives two JSON stores:
+`createProvider(...)` receives `{ provider, storage, hostStorage, local }`.
+The two JSON stores are scoped differently:
 
 | Store | Scope | Use it for |
 | --- | --- | --- |
@@ -191,7 +192,7 @@ runtime(context) {
 ```
 
 For richer integrations, define a named host capability and have a trusted host
-register a handler. The cmux provider uses this pattern for `cmux.open`.
+register a handler. The cmux provider uses this pattern for `cmux.call`.
 
 ## Provider-owned interactions
 
@@ -225,5 +226,8 @@ runtime(context) {
 - Keep developer credentials in `hostStorage`.
 - Implement `validateArtifact(...)` for cached refs whose remote resource may
   disappear.
+- Implement `checks(...)` to report missing auth or configuration during
+  `rig plan` without starting a login flow. Check results feed the provider
+  fingerprint.
 - Use `context.metadata(...)` for run metadata that helps debug provider work.
 - Use `context.local` only for explicit host-side actions.

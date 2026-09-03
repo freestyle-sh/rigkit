@@ -11,11 +11,11 @@
     "@rigkit/provider-cmux": "workspace:*",
     "@rigkit/provider-freestyle": "workspace:*",
     "@rigkit/sdk": "workspace:*",
-    "freestyle": "^0.2.2"
+    "freestyle": "^0.2.10"
   },
   "devDependencies": {
     "@rigkit/cli": "workspace:*",
     "@types/bun": "latest",
-    "typescript": "latest"
+    "typescript": "^6.0.3"
   }
 }

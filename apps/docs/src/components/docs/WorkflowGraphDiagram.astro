@@ -1,0 +1,100 @@
+---
+// Static SVG for the Concepts page: how sequences and parallel branches compile
+// into a graph that ends in workspace.create and operations. Replaces a Mermaid
+// fence, which the docs site has no renderer for.
+import "@/styles/diagram.css";
+---
+
+<figure class="docs-diagram" role="group" aria-label="Workflow graph diagram">
+  <svg
+    viewBox="0 0 660 246"
+    role="img"
+    aria-labelledby="workflow-graph-title workflow-graph-desc"
+    preserveAspectRatio="xMidYMid meet"
+  >
+    <title id="workflow-graph-title">Workflow graph</title>
+    <desc id="workflow-graph-desc">
+      A base image task feeds an install tooling task. Two parallel branches, setup repo and
+      provision database, start from that output and join into the final context. rig create
+      passes the final context to workspace.create, and workspace operations such as open, ssh,
+      test, and status run against the result.
+    </desc>
+
+    <defs>
+      <marker
+        id="graph-arrow-ink"
+        class="dg-marker--ink"
+        viewBox="0 0 10 10"
+        refX="8.5"
+        refY="5"
+        markerWidth="9"
+        markerHeight="9"
+        markerUnits="userSpaceOnUse"
+        orient="auto-start-reverse"
+      >
+        <path d="M0,0 L10,5 L0,10 z"></path>
+      </marker>
+    </defs>
+
+    <!-- Parallel group outline -->
+    <g class="dg-group">
+      <rect x="338" y="14" width="174" height="124" rx="12"></rect>
+      <text x="350" y="27">parallel</text>
+    </g>
+
+    <!-- Edges -->
+    <g class="dg-edge">
+      <path d="M134,82 H176" marker-end="url(#graph-arrow-ink)"></path>
+      <path d="M306,82 C330,82 326,54 350,54" marker-end="url(#graph-arrow-ink)"></path>
+      <path d="M306,82 C330,82 326,110 350,110" marker-end="url(#graph-arrow-ink)"></path>
+      <path d="M500,54 C524,54 522,82 546,82" marker-end="url(#graph-arrow-ink)"></path>
+      <path d="M500,110 C524,110 522,82 546,82" marker-end="url(#graph-arrow-ink)"></path>
+      <path d="M596,104 V150 H140 V178" marker-end="url(#graph-arrow-ink)"></path>
+      <path d="M240,202 H300" marker-end="url(#graph-arrow-ink)"></path>
+    </g>
+
+    <!-- Edge labels -->
+    <g class="dg-edge-label">
+      <text x="368" y="150">rig create</text>
+      <text x="270" y="190">rig run</text>
+    </g>
+
+    <!-- Row 1: tasks -->
+    <g class="dg-node">
+      <rect x="14" y="60" width="120" height="44" rx="10"></rect>
+      <text x="74" y="82">base image</text>
+    </g>
+
+    <g class="dg-node">
+      <rect x="176" y="60" width="130" height="44" rx="10"></rect>
+      <text x="241" y="82">install tooling</text>
+    </g>
+
+    <g class="dg-node">
+      <rect x="350" y="36" width="150" height="36" rx="10"></rect>
+      <text x="425" y="54">setup repo</text>
+    </g>
+
+    <g class="dg-node">
+      <rect x="350" y="92" width="150" height="36" rx="10"></rect>
+      <text x="425" y="110">provision database</text>
+    </g>
+
+    <g class="dg-node dg-node--primary">
+      <rect x="546" y="60" width="100" height="44" rx="10"></rect>
+      <text x="596" y="82">final context</text>
+    </g>
+
+    <!-- Row 2: workspace lifecycle and operations -->
+    <g class="dg-node dg-node--mono">
+      <rect x="40" y="178" width="200" height="48" rx="10"></rect>
+      <text x="140" y="202">workspace.create</text>
+    </g>
+
+    <g class="dg-node">
+      <rect x="300" y="178" width="260" height="48" rx="10"></rect>
+      <text x="430" y="195">workspace operations</text>
+      <text x="430" y="213" class="dg-sub">open · ssh · test · status</text>
+    </g>
+  </svg>
+</figure>

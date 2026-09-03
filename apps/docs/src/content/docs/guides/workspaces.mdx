@@ -116,37 +116,50 @@ Use the Freestyle terminal provider for browser terminal sessions:
 
 ## cmux operation
 
-Use the cmux provider when local cmux should open terminals and an optional
-browser URL connected to the remote workspace:
+Use the cmux provider when local cmux should open a workspace connected to the
+remote VM. The runtime mirrors cmux's socket commands: connect with `ssh`, add
+surfaces, send keystrokes, then focus the workspace.
 
 ```ts
 .workspaceOperation("open-cmux", {
   title: "Open cmux",
+  description: "Open the workspace in cmux",
   run: async ({ providers, workspace }) => {
-    await providers.cmux.open({
-      name: workspace.name,
-      ssh: await providers.freestyle.cmux.createSshOptions({
+    // Connect cmux to the VM over Freestyle's SSH proxy.
+    const cmuxWorkspace = await providers.cmux.ssh({
+      ...(await providers.freestyle.cmux.createSshOptions({
         vmId: workspace.ctx.vmId,
-      }),
-      cwd: workspace.ctx.repoPath,
-      surfaceLayout: "tabs",
-      terminals: [
-        { command: workspace.ctx.devCommand },
-        { command: "codex", focus: false },
-      ],
+      })),
+      name: workspace.name,
+    });
+
+    // A browser surface pointed at the dev server; cmux proxies it through
+    // the remote VM.
+    await providers.cmux.newSurface({
+      workspace: cmuxWorkspace.workspaceId,
+      type: "browser",
       url: `http://localhost:${workspace.ctx.devPort}`,
       focus: true,
-      waitForRemoteReady: {
-        timeoutMs: 90 * 1000,
-        requireProxy: true,
-      },
     });
+
+    // Terminals start as remote shells; send keystrokes to run commands.
+    const terminal = await providers.cmux.newSurface({
+      workspace: cmuxWorkspace.workspaceId,
+      type: "terminal",
+      focus: false,
+    });
+    await providers.cmux.send({
+      workspace: cmuxWorkspace.workspaceId,
+      surface: terminal.surfaceId,
+      text: `cd ${workspace.ctx.repoPath} && ${workspace.ctx.devCommand}\n`,
+    });
+
+    await providers.cmux.selectWorkspace(cmuxWorkspace.workspaceId);
   },
 });
 ```
 
-`surfaceLayout: "tabs"` puts terminals and the browser URL in tabs. Omit it, or
-set `"splits"`, for split panes.
+See the [cmux provider](/providers/cmux) page for the full method list.
 
 ## VS Code operation
 
@@ -189,6 +202,25 @@ import { z } from "@rigkit/sdk";
 
 For workspace operations, `rig run <workspace> <operation>` supplies the target
 workspace. Put extra operation inputs in the Zod object.
+
+## Workflow operations
+
+`.operation(...)` defines a command that is not tied to one workspace. It
+receives `workflow.ctx` and `input` but no `workspace`:
+
+```ts
+.operation("list-snapshots", {
+  title: "List snapshots",
+  run: async ({ workflow, providers }) => {
+    const { snapshots } = await providers.freestyle.client.vms.snapshots.list();
+    return { current: workflow.ctx.snapshotId, snapshots };
+  },
+});
+```
+
+Operation ids share a namespace with Rigkit host commands. These ids are
+reserved: `apply`, `completion`, `create`, `doctor`, `fork`, `help`, `init`,
+`ls`, `plan`, `projects`, `remove`, `run`, and `version`.
 
 ## Defensive create hooks
 

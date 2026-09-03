@@ -35,7 +35,7 @@ describe("Freestyle provider host adapters", () => {
       auth: { type: "token", token: "token" },
       command: "ssh vm-stream+root:token@beta-ssh.freestyle.sh",
     });
-    expect(requests).toContain("POST https://beta-api.freestyle.sh/v5/identities/identity-stream/permissions/vm");
+    expect(requests).toContain("POST https://api.freestyle.sh/v5/identities/identity-stream/permissions/vm");
   });
 
   test("creates cmux ssh options with Freestyle-owned ssh settings", async () => {

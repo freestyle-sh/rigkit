@@ -3,8 +3,13 @@ import {
   execLongCommand,
   type FreestyleSdkVm,
 } from "@rigkit/provider-freestyle";
-import { devServerLogPath, devServerPidPath } from "./config";
+import { devServerLogPath, devServerPidPath, vmUser } from "./config";
 import { shellQuote } from "./shell";
+
+/** Scope a VM handle's commands to the user this setup expects (root). */
+export function asVmUser(vm: FreestyleSdkVm): Pick<FreestyleSdkVm, "exec"> {
+  return vm.linuxUser(vmUser);
+}
 
 type ExecInput = Parameters<FreestyleSdkVm["exec"]>[0];
 

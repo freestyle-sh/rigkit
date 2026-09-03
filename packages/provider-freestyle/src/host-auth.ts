@@ -8,7 +8,7 @@ import { RIGKIT_PROVIDER_FREESTYLE_VERSION } from "./version.ts";
 
 const DEFAULT_STACK_API_URL = "https://api.stack-auth.com";
 const DEFAULT_STACK_APP_URL = "https://dash.freestyle.sh";
-const DEFAULT_FREESTYLE_API_URL = "https://beta-api.freestyle.sh";
+const DEFAULT_FREESTYLE_API_URL = "https://api.freestyle.sh";
 const DEFAULT_STACK_PROJECT_ID = "0edf478c-f123-46fb-818f-34c0024a9f35";
 const DEFAULT_STACK_PUBLISHABLE_CLIENT_KEY = "pck_h2aft7g9pqjzrkdnzs199h1may5wjtdtdxeex7m2wzp1r";
 const DEFAULT_CLI_AUTH_TIMEOUT_MILLIS = 10 * 60 * 1000;

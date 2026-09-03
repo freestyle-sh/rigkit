@@ -1,7 +1,7 @@
 import { updateCodexCliAndEnableGoalsCommand } from "../lib/commands";
 import { vmFirewall, vmIdleTimeoutSeconds } from "../lib/config";
 import type { WebsiteContext } from "../lib/types";
-import { execOrThrow } from "../lib/vm";
+import { asVmUser, execOrThrow } from "../lib/vm";
 import type { SetupTaskHandler } from "./types";
 
 export const updateCodexCliAndEnableGoalTask: SetupTaskHandler<
@@ -18,7 +18,7 @@ export const updateCodexCliAndEnableGoalTask: SetupTaskHandler<
 
   try {
     console.log("updating Codex CLI and enabling /goal");
-    await execOrThrow(vm, "Codex CLI update and /goal enablement", {
+    await execOrThrow(asVmUser(vm), "Codex CLI update and /goal enablement", {
       command: updateCodexCliAndEnableGoalsCommand(),
       timeoutMs: 10 * 60 * 1000,
     });

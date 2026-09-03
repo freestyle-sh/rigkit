@@ -1,0 +1,142 @@
+/* Shared styling for hand-drawn SVG diagrams in the docs.
+   Diagrams are static SVG with no client JS; colors come from docs.css tokens. */
+
+.docs-diagram {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 1.4rem 0;
+  padding: 1.1rem 1.25rem;
+}
+
+.docs-diagram svg {
+  display: block;
+  height: auto;
+  margin: 0 auto;
+  max-width: 640px;
+  width: 100%;
+}
+
+/* Nodes */
+.dg-node rect {
+  fill: var(--panel);
+  stroke: var(--line-strong);
+  stroke-width: 1.4;
+}
+
+.dg-node text {
+  dominant-baseline: middle;
+  fill: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.dg-node--mono text {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.dg-node--primary rect {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
+.dg-node--primary text {
+  fill: var(--accent);
+  font-weight: 700;
+}
+
+.dg-node--muted rect {
+  fill: var(--panel-soft);
+  stroke: var(--line-strong);
+  stroke-dasharray: 5 4;
+}
+
+.dg-node--muted text {
+  fill: var(--ink-soft);
+}
+
+.dg-node--terminal rect {
+  fill: var(--panel-soft);
+  stroke: var(--line-strong);
+}
+
+.dg-node--terminal text {
+  fill: var(--ink-soft);
+}
+
+.dg-node .dg-sub {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Stacked "many of these" shadow rects behind a node. */
+.dg-stack rect {
+  fill: var(--panel);
+  stroke: var(--line-strong);
+  stroke-width: 1.2;
+}
+
+/* Group outlines (sequence / parallel) */
+.dg-group rect {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-dasharray: 4 4;
+  stroke-width: 1.2;
+}
+
+.dg-group text {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* Edges */
+.dg-edge path {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.dg-edge--muted path {
+  stroke: var(--faint);
+  stroke-dasharray: 4 4;
+  stroke-width: 1.4;
+}
+
+.dg-marker--ink {
+  fill: var(--ink-soft);
+}
+
+.dg-marker--muted {
+  fill: var(--faint);
+}
+
+/* Edge labels sit on top of lines with a panel-colored halo. */
+.dg-edge-label text {
+  dominant-baseline: middle;
+  fill: var(--muted);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 550;
+  paint-order: stroke;
+  stroke: var(--panel-soft);
+  stroke-linejoin: round;
+  stroke-width: 6;
+  text-anchor: middle;
+}
+
+@media (max-width: 760px) {
+  .docs-diagram {
+    padding: 0.85rem;
+  }
+}
